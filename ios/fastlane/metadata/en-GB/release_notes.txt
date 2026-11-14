@@ -1,0 +1,1 @@
+First release of Bondbell. Save your Premium Bond numbers once, including old paper certificates, and check each draw on your device with no login. Also: unclaimed prize search, an optional results-day reminder and a sample mode to try it first.

@@ -1,0 +1,27 @@
+WHAT THE APP DOES
+Bondbell lets UK savers check their own Premium Bond numbers against the monthly prize draw results. The user saves bond number ranges (from a statement or old paper certificates). When they tap Check, the app downloads NS&I's publicly published winning-numbers file directly from www.nsandi.com, compares it with the saved numbers on the device, keeps only the matches and deletes the download. It also searches NS&I's public list of unclaimed prizes and can schedule an optional local reminder on the day new results are expected.
+
+NO LOGIN NEEDED
+There are no accounts. To see the whole flow with no setup, tap "Try with sample numbers" on the last onboarding page (or turn on Sample mode in Settings). Then tap "Check the latest draw" on the Check tab, then "Check the sample": the app runs the real download-and-scan pipeline against bundled, made-up sample files and shows a result with sample prizes. The Unclaimed tab's "Search all my bonds" also finds a sample unclaimed prize (Pro only; a single-number search is free). A banner marks sample mode throughout, and sample data is kept apart from real data.
+
+NOT A FINANCIAL SERVICE, NOT GAMBLING
+- Bondbell reads only the lists NS&I publishes for anyone to download, on the user's device and at the user's request. It offers no NS&I account access, no login to NS&I, no buying or selling of bonds, no payments, no transfers and no financial advice.
+- Premium Bonds are a UK government savings product sold by NS&I (National Savings and Investments). Holders keep their capital and the monthly prize draw is the interest. Bondbell sells no entries, takes no stakes and pays no prizes; it only checks published results. Every result tells the user to confirm with NS&I, and a result with prizes links to NS&I to claim.
+
+PURCHASES
+- Bondbell Pro (com.froggyeye.bondbell.pro, non-consumable): unlimited holders, earlier draws (the months NS&I currently lists), unclaimed search for all saved bonds at once, and history and stats. Reach it from Settings > "See what Pro adds", the History tab, "About Bondbell Pro" on the Check tab's "Earlier draws" card, or by adding a second holder on the My bonds tab. "Restore purchases" is on the Pro screen and in Settings.
+- Tips (com.froggyeye.bondbell.tip.small / .medium / .large, consumable): optional thank-you payments that unlock nothing, as the app says next to them. They are in the Tip jar card in Settings, and as one quiet card under a real result that lists prizes (never in sample mode, never on a no-prize result).
+
+PERMISSIONS
+Notifications only, requested when the user turns on the results-day reminder, never at launch. The reminders are scheduled locally; there is no push service. No other permissions or usage-description strings are used.
+
+PRIVACY
+No accounts, analytics, ads, tracking or server of ours. The app's own network requests go only to www.nsandi.com, when the user asks for a check (NS&I's server sees the device's IP address and the app's user agent, never the bond numbers); purchases go through StoreKit. Holder names, bond numbers and results are stored in an app folder excluded from iCloud and computer backups. Privacy label: Data Not Collected.
+
+INDEPENDENCE
+Bondbell is an independent app by Froggy Eye Ltd. It is not affiliated with, endorsed by or connected to NS&I, and says so in onboarding, on the Check tab, in Settings and in About. "Premium Bonds" is used only to describe which product's results the app checks.
+
+NOTES FOR TESTING WITH REAL DATA
+A real check of the latest draw downloads a file of about 34 MB from nsandi.com (the app shows the size first and recommends Wi-Fi). Any valid-looking bond range can be entered, for example 100AB100000 to 100AB100999.
+
+Contact: info@froggyeye.com

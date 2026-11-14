@@ -1,0 +1,36 @@
+Bondbell is an independent Premium Bond checker for UK savers. Save your Premium Bond numbers once, and whenever you tap Check, Bondbell compares them with NS&I's published list of winning numbers, right here on your phone. There is no login and no account.
+
+NO LOGIN, NOTHING UPLOADED
+Your bond numbers are saved on your device and are never sent anywhere. When you check, your phone downloads NS&I's public list directly from nsandi.com, Bondbell compares it with your numbers on the device, keeps only the matches and deletes the download.
+
+OLD PAPER CERTIFICATES AND FAMILY BONDS
+Add bonds as ranges or single numbers, from a statement or from old paper certificates. It works just as well for a parent's or grandparent's bonds as for your own. If a number can't be read, Bondbell explains why in plain English, for example when a holder's number has been typed instead of a bond number.
+
+CHECK YOUR PREMIUM BONDS IN A TAP
+See the size of the file before it downloads, follow the progress, and cancel at any time. The result lists any prizes by holder, or says plainly that none of your bonds is on that month's list. Every result reminds you to confirm with NS&I, and when prizes are listed it explains how to claim them.
+
+UNCLAIMED PRIZES, BACK TO 1957
+Search NS&I's list of prizes that were never claimed, which goes back to 1957. It is worth a look if you have found old certificates in a drawer. The list shows the value of each unclaimed prize, and claims are made through NS&I.
+
+RESULTS-DAY REMINDER
+New results are normally published around the start of each month. Turn on an optional reminder at 9am UK time on the day they are expected. It tells you the new list should be available; it does not tell you whether you have a prize.
+
+TRY IT FIRST
+"Try with sample numbers" runs a complete check with made-up numbers, so you can see how it works before adding your own. Sample data is clearly labelled and kept apart from your real bonds.
+
+BONDBELL PRO
+One purchase, yours for good. No subscription. Pro adds:
+• Unlimited holders (the free version covers one holder, with as many ranges as you like)
+• Earlier draws: check any of the months NS&I currently publishes, usually about six
+• Unclaimed search for all your saved bonds at once (free searches one number at a time)
+• History and stats for every draw you have checked
+
+Checking the latest draw, single-number unclaimed searches, reminders and sample mode are all free.
+
+TIP JAR
+If Bondbell is useful to you, you can leave an optional tip. Tips are a thank-you only and unlock nothing.
+
+PRIVACY
+No ads, no tracking, no analytics and no server of ours in the middle. Purchases are handled by Google Play. Your bond numbers are not included in device backups, and you can delete them and your results from Settings at any time.
+
+Bondbell is an independent app and is not affiliated with, endorsed by or connected to NS&I (National Savings and Investments). Premium Bonds is a registered trademark of the Director of Savings. Results come from the public lists NS&I publishes; always confirm a prize with NS&I before relying on it.
