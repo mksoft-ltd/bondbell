@@ -390,6 +390,37 @@ void main() {
       expect(h.container.read(isProProvider), isFalse);
     });
 
+    // Round 3b: Play's declaration says sample mode is "also available on
+    // Home". It wasn't; this pins the Home entry point.
+    testWidgets('Home offers "Try with sample numbers", which opens sample '
+        'mode with Pro features', (WidgetTester tester) async {
+      final Harness h = await pumpBondbell(tester, route: '/home');
+      expect(h.container.read(sampleModeProvider), isFalse);
+      final Finder button =
+          find.widgetWithText(OutlinedButton, 'Try with sample numbers');
+      await tester.scrollUntilVisible(button, 200);
+      await tester.ensureVisible(button);
+      await tester.pumpAndSettle();
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+      expect(h.container.read(sampleModeProvider), isTrue);
+      expect(h.container.read(proFeaturesProvider), isTrue);
+      expect(h.container.read(isProProvider), isFalse);
+      expect(find.text('Try with sample numbers'), findsNothing,
+          reason: 'not offered while already in sample mode');
+    });
+
+    testWidgets('Home still offers the sample when the user has bonds',
+        (WidgetTester tester) async {
+      await pumpBondbell(
+        tester,
+        prefs: <String, Object>{'real.holders': holdersJson(<Holder>[meHolder])},
+        route: '/home',
+      );
+      await tester.scrollUntilVisible(find.text('Try with sample numbers'), 200);
+      expect(find.text('Try with sample numbers'), findsOneWidget);
+    });
+
     testWidgets('Home lists the earlier sample months to check',
         (WidgetTester tester) async {
       await pumpBondbell(

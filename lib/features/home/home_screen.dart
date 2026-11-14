@@ -26,6 +26,7 @@ class HomeScreen extends ConsumerWidget {
     final int bonds = uniqueBondCount(holders);
     final ThemeData t = Theme.of(context);
     final DateTime next = ResultsCalendar.nextResultsDay(DateTime.now());
+    final bool sample = ref.watch(sampleModeProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text(AppConstants.appName)),
@@ -58,13 +59,56 @@ class HomeScreen extends ConsumerWidget {
           else
             const _LatestDrawCard(),
           const SizedBox(height: 16),
+          // With no bonds yet, offer the sample right under "Add".
+          if (bonds == 0 && !sample) ...<Widget>[
+            const _TrySampleCard(),
+            const SizedBox(height: 16),
+          ],
           const _ReminderCard(),
           const SizedBox(height: 16),
           if (bonds > 0) ...<Widget>[
             const _EarlierDraws(),
             const SizedBox(height: 16),
           ],
+          if (bonds > 0 && !sample) ...<Widget>[
+            const _TrySampleCard(),
+            const SizedBox(height: 16),
+          ],
           const InfoNote(AppConstants.independenceNotice),
+        ],
+      ),
+    );
+  }
+}
+
+/// Home's way into sample mode (also on the last onboarding page and in
+/// Settings). Store review notes point reviewers here.
+class _TrySampleCard extends ConsumerWidget {
+  const _TrySampleCard();
+
+  static const String body =
+      'See every feature, including the Pro features, on built-in sample '
+      'numbers. Your own bonds aren\'t touched, and you can exit at any time.';
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ThemeData t = Theme.of(context);
+    return SectionCard(
+      title: 'Try Bondbell with sample numbers',
+      icon: Icons.science_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text(body, style: t.textTheme.bodyLarge),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: () async {
+              ref.read(checkSessionProvider.notifier).reset();
+              await ref.read(appSettingsProvider.notifier).setSampleMode(true);
+            },
+            icon: const Icon(Icons.science_outlined),
+            label: const Text('Try with sample numbers'),
+          ),
         ],
       ),
     );
