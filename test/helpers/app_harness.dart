@@ -81,6 +81,7 @@ Future<Harness> pumpBondbell(
   Size size = Surfaces.phone,
   double textScale = 1,
   String? route,
+  LocalStore Function(SharedPreferences prefs)? localFactory,
 }) async {
   tester.view.physicalSize = size * 3;
   tester.view.devicePixelRatio = 3;
@@ -92,7 +93,9 @@ Future<Harness> pumpBondbell(
     'settings.onboarded': onboarded,
     ...prefs,
   });
-  final LocalStore local = LocalStore(await SharedPreferences.getInstance());
+  final SharedPreferences prefsInstance = await SharedPreferences.getInstance();
+  final LocalStore local =
+      localFactory?.call(prefsInstance) ?? LocalStore(prefsInstance);
   final FakeStoreGateway s = store ?? FakeStoreGateway();
   final FakeReminderService r = reminders ?? FakeReminderService();
   final ProviderContainer c = ProviderContainer(
@@ -193,4 +196,21 @@ Future<void> scrollTo(WidgetTester tester, Finder finder) async {
   );
   await tester.ensureVisible(finder);
   await tester.pump();
+}
+
+/// A store whose writes to private (vault) keys can be made to fail, like a
+/// full disk (code review N1).
+class FailingStore extends LocalStore {
+  FailingStore(super.prefs);
+  bool fail = true;
+  int refused = 0;
+
+  @override
+  Future<bool> setString(String key, String value) async {
+    if (fail && LocalStore.isPrivateKey(key)) {
+      refused++;
+      return false;
+    }
+    return super.setString(key, value);
+  }
 }

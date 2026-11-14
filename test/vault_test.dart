@@ -52,11 +52,67 @@ void main() {
     expect((await DataVault.open(dir)).keys, isEmpty);
   });
 
-  test('a corrupt vault is kept aside, not overwritten', () async {
+  // ---- Fix round 3 (code review N1, security N-1) -----------------------
+
+  void readOnly(bool on) =>
+      Process.runSync('chmod', <String>[on ? '555' : '755', dir.path]);
+
+  test('a failed write reports false and changes nothing', () async {
+    final DataVault v = await DataVault.open(dir);
+    expect(await v.set('real.holders', 'first'), isTrue);
+    readOnly(true);
+    addTearDown(() => readOnly(false));
+    expect(await v.set('real.holders', 'second'), isFalse);
+    expect(v.get('real.holders'), 'first', reason: 'not shown as saved');
+    readOnly(false);
+    expect(await v.set('real.holders', 'second'), isTrue, reason: 'retry works');
+    expect((await DataVault.open(dir)).get('real.holders'), 'second');
+  });
+
+  test('a damaged vault is restored from the last good copy, and said so',
+      () async {
+    final DataVault first = await DataVault.open(dir);
+    await first.set('real.holders', 'good');
+    // Next launch: opens cleanly, which refreshes the last-good copy.
+    expect((await DataVault.open(dir)).status, VaultOpenStatus.ok);
     File('${dir.path}/vault.json').writeAsStringSync('{"real.holders": ');
     final DataVault v = await DataVault.open(dir);
+    expect(v.status, VaultOpenStatus.recovered);
+    expect(v.get('real.holders'), 'good');
+    // The damaged file is kept aside, not overwritten, and vault.json is
+    // healthy again.
+    expect(dir.listSync().where((FileSystemEntity e) => e.path.contains('.corrupt-')), hasLength(1));
+    expect((await DataVault.open(dir)).status, VaultOpenStatus.ok);
+  });
+
+  test('with no usable copy the vault opens empty and says the data was lost',
+      () async {
+    File('${dir.path}/vault.json').writeAsStringSync('not json');
+    final DataVault v = await DataVault.open(dir);
+    expect(v.status, VaultOpenStatus.lost);
     expect(v.keys, isEmpty);
-    expect(File('${dir.path}/vault.json.bak').readAsStringSync(), '{"real.holders": ');
+    expect(vaultStatusMessage(v.status), contains("couldn't be recovered"));
+    expect(vaultStatusMessage(VaultOpenStatus.ok), isNull);
+  });
+
+  test('"Delete all my data" leaves no copy behind (.bak, .tmp, .corrupt)',
+      () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{'settings.onboarded': true});
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final DataVault v = await DataVault.open(dir);
+    final LocalStore s = LocalStore.withVault(prefs, v);
+    await s.setString('real.holders', '47DW185520');
+    File('${dir.path}/vault.json.bak').writeAsStringSync('{"real.holders":"47DW185520"}');
+    File('${dir.path}/vault.json.tmp').writeAsStringSync('{"real.holders":"47DW185520"}');
+    File('${dir.path}/vault.json.corrupt-1').writeAsStringSync('{"real.holders": 47DW');
+    expect(await s.deleteAllPrivateData(), isTrue);
+    final List<String> left = dir
+        .listSync()
+        .map((FileSystemEntity e) => e.uri.pathSegments.last)
+        .toList();
+    expect(left, <String>['vault.json']);
+    expect(File('${dir.path}/vault.json').readAsStringSync(), isNot(contains('47DW')));
+    expect(prefs.getBool('settings.onboarded'), isTrue, reason: 'settings kept');
   });
 
   test('quick successive saves land in order', () async {

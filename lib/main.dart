@@ -55,6 +55,7 @@ Future<void> main() async {
   final ProviderContainer container = ProviderContainer(
     overrides: [
       localStoreProvider.overrideWithValue(store),
+      vaultStatusProvider.overrideWithValue(vault.status),
       storeGatewayProvider.overrideWithValue(NativeStoreGateway()),
       reminderServiceProvider.overrideWithValue(reminders),
       if (screenshotMode) forceProProvider.overrideWithValue(true),

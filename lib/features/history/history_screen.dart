@@ -180,21 +180,25 @@ class _HistoryRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Wrap(
-                      alignment: WrapAlignment.spaceBetween,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: 12,
-                      children: <Widget>[
-                        Text(record.label, style: t.textTheme.titleMedium),
-                        Text(
-                          gbp(record.totalWon),
-                          style: t.textTheme.titleMedium?.copyWith(
-                            color: record.hasWins
-                                ? t.colorScheme.secondary
-                                : t.colorScheme.onSurfaceVariant,
+                    SizedBox(
+                      // Full width, so spaceBetween puts the amount at the right edge.
+                      width: double.infinity,
+                      child: Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 12,
+                        children: <Widget>[
+                          Text(record.label, style: t.textTheme.titleMedium),
+                          Text(
+                            gbp(record.totalWon),
+                            style: t.textTheme.titleMedium?.copyWith(
+                              color: record.hasWins
+                                  ? t.colorScheme.secondary
+                                  : t.colorScheme.onSurfaceVariant,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(

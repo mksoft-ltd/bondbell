@@ -77,53 +77,56 @@ Future<ScanSummary> scanZipFile(
   return parser.finish(entry.name);
 }
 
-/// Splits text into lines like [LineSplitter] (\n, \r\n or \r), but
-/// throws instead of buffering a line longer than [maxChars].
+/// Splits text into lines exactly as [LineSplitter] does (it IS
+/// [LineSplitter]), but first refuses any run of more than [maxChars]
+/// characters without a line break, so [LineSplitter] never buffers an
+/// unbounded partial line.
+///
+/// The guard is a synchronous `map` that only looks for the last line break
+/// in each chunk, so the splitting stays in [LineSplitter]'s fast chunked
+/// path (review N3: a hand-written `async*` splitter doubled scan time).
 class BoundedLineSplitter extends StreamTransformerBase<String, String> {
   const BoundedLineSplitter(this.maxChars);
   final int maxChars;
 
   @override
-  Stream<String> bind(Stream<String> stream) async* {
-    final StringBuffer partial = StringBuffer();
-    bool lastWasCr = false;
-    await for (final String chunk in stream) {
-      int start = 0;
+  Stream<String> bind(Stream<String> stream) {
+    int run = 0; // characters since the last \n or \r
+    return stream.map((String chunk) {
+      int first = -1;
+      int last = -1;
       for (int i = 0; i < chunk.length; i++) {
         final int c = chunk.codeUnitAt(i);
         if (c == 10 || c == 13) {
-          if (c == 10 && lastWasCr && i == start && partial.isEmpty) {
-            // The \n of a \r\n split across chunks: already ended.
-            lastWasCr = false;
-            start = i + 1;
-            continue;
-          }
-          partial.write(chunk.substring(start, i));
-          yield partial.toString();
-          partial.clear();
-          lastWasCr = c == 13;
-          if (c == 13 && i + 1 < chunk.length && chunk.codeUnitAt(i + 1) == 10) {
-            i++;
-            lastWasCr = false;
-          }
-          start = i + 1;
-        } else {
-          lastWasCr = false;
+          first = i;
+          break;
         }
       }
-      if (start < chunk.length) {
-        partial.write(chunk.substring(start));
-        lastWasCr = false;
+      if (first < 0) {
+        run += chunk.length;
+      } else {
+        // The stretch carried over from earlier chunks ends here.
+        if (run + first > maxChars) _tooLong();
+        for (int i = chunk.length - 1; i >= first; i--) {
+          final int c = chunk.codeUnitAt(i);
+          if (c == 10 || c == 13) {
+            last = i;
+            break;
+          }
+        }
+        run = chunk.length - last - 1;
       }
-      if (partial.length > maxChars) {
-        throw const ScanLimitException(
-          'NS&I\'s file has a line far longer than its usual layout, so '
-          'Bondbell stopped reading it.',
-        );
-      }
-    }
-    if (partial.isNotEmpty) yield partial.toString();
+      // Stretches wholly inside one chunk are emitted by LineSplitter at
+      // once, so they can't grow its buffer; only the open tail can.
+      if (run > maxChars) _tooLong();
+      return chunk;
+    }).transform(const LineSplitter());
   }
+
+  static Never _tooLong() => throw const ScanLimitException(
+    'NS&I\'s file has a line far longer than its usual layout, so '
+    'Bondbell stopped reading it.',
+  );
 }
 
 /// Runs [scanZipFile] on a background isolate so the UI never stutters,

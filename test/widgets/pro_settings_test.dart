@@ -247,7 +247,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(h.container.read(holdersProvider), isEmpty);
       expect(h.container.read(recordsProvider), isEmpty);
-      expect(find.text('All your data has been deleted.'), findsOneWidget);
+      expect(find.text('Your holders, bond numbers and results have been deleted.'), findsOneWidget);
       expect(h.container.read(isProProvider), isTrue);
     });
   });

@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/storage/local_store.dart';
 import '../features/draws/presentation/check_session.dart';
+import 'router.dart';
 
 /// Orientations to request for a device, or null to leave them to the
 /// platform. iOS is decided by Info.plist (iPhone portrait-only, iPad all
@@ -45,6 +47,32 @@ class _AppHooksState extends ConsumerState<AppHooks> {
     _lifecycle = AppLifecycleListener(
       onResume: () => ref.read(indexProvider.notifier).dropIfStale(),
     );
+    final String? damaged = vaultStatusMessage(ref.read(vaultStatusProvider));
+    if (damaged != null) {
+      // Say what happened to the user's data once, plainly (review N1),
+      // rather than opening to an unexplained empty app.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final BuildContext? nav = ref
+            .read(routerProvider)
+            .routerDelegate
+            .navigatorKey
+            .currentContext;
+        if (nav == null) return;
+        showDialog<void>(
+          context: nav,
+          builder: (BuildContext c) => AlertDialog(
+            title: const Text('Your saved data was damaged'),
+            content: Text(damaged),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(c).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      });
+    }
   }
 
   @override

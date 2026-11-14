@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/calendar/results_calendar.dart';
+import '../../../core/storage/local_store.dart';
 import '../../bonds/domain/bond_number.dart';
 import '../../bonds/domain/holder.dart';
 import '../../bonds/presentation/holders_controller.dart';
@@ -401,6 +402,16 @@ class CheckSessionController extends Notifier<CheckSessionState> {
           phase: CheckPhase.failed,
           error: e.message,
           layoutChanged: e.layoutChanged,
+        );
+      }
+    } on SaveFailedException {
+      if (gen == _generation) {
+        state = state.copyWith(
+          phase: CheckPhase.failed,
+          error:
+              'The check finished, but Bondbell couldn\'t save the result on '
+              'your device. It may be out of storage space. Please free some '
+              'space and try again.',
         );
       }
     } on ScanException catch (e) {

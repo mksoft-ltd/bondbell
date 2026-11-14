@@ -116,9 +116,13 @@ Future<void> addHolderFlow(BuildContext context, WidgetRef ref) async {
     return;
   }
   final String? name = await askName(context, title: 'Who are these bonds for?');
-  if (name == null) return;
-  final Holder h = await ref.read(holdersProvider.notifier).addHolder(name);
-  if (context.mounted) await context.push('/holder/${h.id}');
+  if (name == null || !context.mounted) return;
+  Holder? h;
+  final bool saved = await saveOrExplain(
+    context,
+    () async => h = await ref.read(holdersProvider.notifier).addHolder(name),
+  );
+  if (saved && context.mounted) await context.push('/holder/${h!.id}');
 }
 
 Future<String?> askName(

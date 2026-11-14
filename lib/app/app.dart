@@ -23,6 +23,9 @@ class BondbellApp extends ConsumerWidget {
     PurchaseNotice.tipCleared =>
       'An earlier tip hadn\'t finished and has now been cleared. Please try '
           'again.',
+    PurchaseNotice.pendingEarlier =>
+      'Your earlier purchase is still waiting for approval from the store. '
+          'It will complete on its own, so there\'s no need to buy again.',
     PurchaseNotice.cancelled => null,
     PurchaseNotice.failed => 'The purchase didn\'t go through. Please try '
         'again.',

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -41,18 +42,21 @@ List<Holder> sampleHolders() => <Holder>[
     try {
       final Map<String, Object?> m = h! as Map<String, Object?>;
       final List<BondRange> ranges = <BondRange>[];
-      for (final Object? r in (m['ranges'] as List<Object?>?) ?? const <Object?>[]) {
+      for (final Object? r
+          in (m['ranges'] as List<Object?>?) ?? const <Object?>[]) {
         try {
           ranges.add(BondRange.fromJson(r! as Map<String, Object?>));
         } on Object {
           lossy = true;
         }
       }
-      out.add(Holder(
-        id: m['id']! as String,
-        name: m['name']! as String,
-        ranges: ranges,
-      ));
+      out.add(
+        Holder(
+          id: m['id']! as String,
+          name: m['name']! as String,
+          ranges: ranges,
+        ),
+      );
     } on Object {
       lossy = true;
     }
@@ -89,9 +93,29 @@ class HoldersController extends Notifier<List<Holder>> {
     return parsed.holders;
   }
 
-  Future<void> _save(List<Holder> next) async {
-    state = next;
-    await _store.writeJson(_key, next.map((Holder h) => h.toJson()).toList());
+  Future<void> _pending = Future<void>.value();
+
+  /// Applies [change] to the current holders, writes the result, and only
+  /// then shows it. Mutations run one after another, each from the state
+  /// the previous one left. A failed write throws [SaveFailedException] and
+  /// changes nothing (code review N1).
+  Future<void> _mutate(List<Holder> Function(List<Holder> state) change) {
+    final Completer<void> done = Completer<void>();
+    _pending = _pending.then((_) async {
+      try {
+        final List<Holder> next = change(state);
+        final bool ok = await _store.writeJson(
+          _key,
+          next.map((Holder h) => h.toJson()).toList(),
+        );
+        if (!ok) throw const SaveFailedException();
+        if (ref.mounted) state = next;
+        done.complete();
+      } on Object catch (e, st) {
+        done.completeError(e, st);
+      }
+    });
+    return done.future;
   }
 
   /// Throws [FreeTierLimitException] past [FreeTier.maxHolders] without
@@ -102,58 +126,71 @@ class HoldersController extends Notifier<List<Holder>> {
       throw const FreeTierLimitException();
     }
     final Holder h = Holder(id: newId(), name: name.trim());
-    await _save(<Holder>[...state, h]);
+    await _mutate((List<Holder> state) => <Holder>[...state, h]);
     return h;
   }
 
-  Future<void> rename(String id, String name) => _save(<Holder>[
-    for (final Holder h in state) h.id == id ? h.copyWith(name: name) : h,
-  ]);
+  Future<void> rename(String id, String name) => _mutate(
+    (List<Holder> state) => <Holder>[
+      for (final Holder h in state) h.id == id ? h.copyWith(name: name) : h,
+    ],
+  );
 
-  Future<void> deleteHolder(String id) =>
-      _save(state.where((Holder h) => h.id != id).toList());
+  Future<void> deleteHolder(String id) => _mutate(
+    (List<Holder> state) => state.where((Holder h) => h.id != id).toList(),
+  );
 
   Future<void> addRange(String holderId, BondNumber start, BondNumber end) =>
-      _save(<Holder>[
-        for (final Holder h in state)
-          h.id == holderId
-              ? h.copyWith(ranges: <BondRange>[
-                  ...h.ranges,
-                  BondRange(id: newId(), start: start, end: end),
-                ])
-              : h,
-      ]);
+      _mutate(
+        (List<Holder> state) => <Holder>[
+          for (final Holder h in state)
+            h.id == holderId
+                ? h.copyWith(
+                    ranges: <BondRange>[
+                      ...h.ranges,
+                      BondRange(id: newId(), start: start, end: end),
+                    ],
+                  )
+                : h,
+        ],
+      );
 
   Future<void> updateRange(
     String holderId,
     String rangeId,
     BondNumber start,
     BondNumber end,
-  ) => _save(<Holder>[
-    for (final Holder h in state)
-      h.id == holderId
-          ? h.copyWith(ranges: <BondRange>[
-              for (final BondRange r in h.ranges)
-                r.id == rangeId
-                    ? BondRange(id: r.id, start: start, end: end)
-                    : r,
-            ])
-          : h,
-  ]);
+  ) => _mutate(
+    (List<Holder> state) => <Holder>[
+      for (final Holder h in state)
+        h.id == holderId
+            ? h.copyWith(
+                ranges: <BondRange>[
+                  for (final BondRange r in h.ranges)
+                    r.id == rangeId
+                        ? BondRange(id: r.id, start: start, end: end)
+                        : r,
+                ],
+              )
+            : h,
+    ],
+  );
 
-  Future<void> deleteRange(String holderId, String rangeId) =>
-      _save(<Holder>[
-        for (final Holder h in state)
-          h.id == holderId
-              ? h.copyWith(
-                  ranges: h.ranges
-                      .where((BondRange r) => r.id != rangeId)
-                      .toList(),
-                )
-              : h,
-      ]);
+  Future<void> deleteRange(String holderId, String rangeId) => _mutate(
+    (List<Holder> state) => <Holder>[
+      for (final Holder h in state)
+        h.id == holderId
+            ? h.copyWith(
+                ranges: h.ranges
+                    .where((BondRange r) => r.id != rangeId)
+                    .toList(),
+              )
+            : h,
+    ],
+  );
 
-  Future<void> replaceAll(List<Holder> holders) => _save(holders);
+  Future<void> replaceAll(List<Holder> holders) =>
+      _mutate((List<Holder> _) => holders);
 }
 
 class FreeTierLimitException implements Exception {

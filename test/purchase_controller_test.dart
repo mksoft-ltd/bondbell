@@ -354,6 +354,41 @@ void main() {
       });
     });
 
+    // Regression (code review N2): an earlier Play order of the same item,
+    // still pending, makes Play answer "already owned". The user was told
+    // "cleared, please try again" (tip) or "didn't go through" (Pro).
+    for (final String id in <String>[AppConstants.proProductId, AppConstants.tipMediumId]) {
+      test('"already owned" because $id is still pending says so', () {
+        store.onRestore = () => <PurchaseDetails>[playPendingRestored(id)];
+        run((FakeAsync clock, ProviderContainer c) {
+          if (id == AppConstants.proProductId) {
+            ctrl(c).buyPro();
+          } else {
+            ctrl(c).tip(id);
+          }
+          clock.flushMicrotasks();
+          store.emit(<PurchaseDetails>[playAlreadyOwned()]);
+          clock.flushMicrotasks();
+          clock.elapse(PurchaseController.restoreWindow);
+          expect(st(c).notice, PurchaseNotice.pendingEarlier);
+          expect(st(c).busy, isFalse);
+          expect(st(c).proOwned, isFalse, reason: 'pending never grants');
+          expect(store.consumed, isEmpty, reason: 'a pending tip is not consumed');
+        });
+      });
+    }
+
+    test('Restore that finds only a pending order says it is waiting', () {
+      store.onRestore = () => <PurchaseDetails>[playPendingRestored(pro)];
+      run((FakeAsync clock, ProviderContainer c) {
+        ctrl(c).restore();
+        clock.flushMicrotasks();
+        clock.elapse(PurchaseController.restoreWindow);
+        expect(st(c).notice, PurchaseNotice.pendingEarlier);
+        expect(st(c).proOwned, isFalse);
+      });
+    });
+
     test('a billing flow that refuses to start triggers a quiet restore', () {
       store.buyStarts = false;
       store.onRestore = () => <PurchaseDetails>[

@@ -89,6 +89,7 @@ class NsiDrawSource implements DrawSource {
     this.downloadCap = maxDownloadBytes,
     this.pageCap = maxPageBytes,
     this.deadline = totalDeadline,
+    this.pageReadDeadline = pageDeadline,
   }) : _clientFactory = clientFactory ?? http.Client.new,
       _ua = AppConstants.userAgent(
         platform ?? (Platform.isIOS ? 'iOS' : 'Android'),
@@ -102,6 +103,7 @@ class NsiDrawSource implements DrawSource {
   final int downloadCap;
   final int pageCap;
   final Duration deadline;
+  final Duration pageReadDeadline;
 
   /// Longest silence between two chunks.
   static const Duration _timeout = Duration(seconds: 30);
@@ -110,7 +112,13 @@ class NsiDrawSource implements DrawSource {
   /// downloads page ~96 KB; winners ZIP 33.6 MB; unclaimed ZIP 12.4 MB.
   static const int maxPageBytes = 2 * 1024 * 1024;
   static const int maxDownloadBytes = 200 * 1024 * 1024;
-  static const Duration totalDeadline = Duration(minutes: 10);
+  /// 34 MB in 30 minutes needs ~0.15 Mbit/s; a dead connection is still
+  /// caught by the 30 s stall timeout (review N4).
+  static const Duration totalDeadline = Duration(minutes: 30);
+
+  /// Whole downloads-page read, including a server that trickles bytes
+  /// just inside the stall timeout (security N-2).
+  static const Duration pageDeadline = Duration(seconds: 60);
   static const int maxRedirects = 5;
 
   static const String tooLarge =
@@ -171,8 +179,9 @@ class NsiDrawSource implements DrawSource {
         );
       }
       final BytesBuilder body = BytesBuilder(copy: false);
-      await for (final List<int> chunk
-          in r.stream.timeout(_timeout).timeout(_timeout * 2)) {
+      final Stopwatch clock = Stopwatch()..start();
+      await for (final List<int> chunk in r.stream.timeout(_timeout)) {
+        if (clock.elapsed > pageReadDeadline) throw TimeoutException('page');
         body.add(chunk);
         if (body.length > pageCap) {
           throw const SourceException(

@@ -148,11 +148,9 @@ class SettingsScreen extends ConsumerWidget {
       context: context,
       builder: (BuildContext c) => AlertDialog(
         title: const Text('Delete all your data?'),
-        content: Text(
-          'This removes every holder, bond number and saved result from '
-          'this ${deviceNoun(c)}. It can\'t be undone. Purchases aren\'t affected and '
-          'can be restored.',
-        ),
+        // Exactly what deleteAllPrivateData removes, and what it keeps
+        // (security N-1).
+        content: Text(deleteAllDialogText(deviceNoun(c))),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.of(c).pop(false),
@@ -168,17 +166,29 @@ class SettingsScreen extends ConsumerWidget {
     if (ok != true) return;
     ref.read(checkSessionProvider.notifier).reset();
     final LocalStore store = ref.read(localStoreProvider);
-    await store.clearPrefix('real.');
-    await store.clearPrefix('sample.');
+    final bool done = await store.deleteAllPrivateData();
     ref.invalidate(holdersProvider);
     ref.invalidate(recordsProvider);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('All your data has been deleted.')),
+        SnackBar(
+          content: Text(
+            done
+                ? 'Your holders, bond numbers and results have been deleted.'
+                : 'Bondbell couldn\'t delete everything. Please try again.',
+          ),
+        ),
       );
     }
   }
 }
+
+/// The "Delete all my data" promise, matching
+/// [LocalStore.deleteAllPrivateData] exactly.
+String deleteAllDialogText(String device) =>
+    'This permanently removes every holder, bond number and saved result '
+    'from this $device, including sample-mode data. Your settings, reminders '
+    'and any Bondbell Pro purchase are kept. This can\'t be undone.';
 
 class _LinkTile extends StatelessWidget {
   const _LinkTile({

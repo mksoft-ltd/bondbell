@@ -33,10 +33,13 @@ abstract final class AppConstants {
     tipLargeId,
   ];
 
+  /// Word for word the first two sentences of the store disclaimer
+  /// (docs/ASO.md §4, both stores' long descriptions). The marks belong to
+  /// the Director of Savings, not to NS&I itself (compliance S-2).
   static const String independenceNotice =
       'Bondbell is an independent app and is not affiliated with, endorsed '
-      'by, or connected to NS&I. "Premium Bonds" and "NS&I" are trade marks '
-      'of National Savings and Investments.';
+      'by or connected to NS&I (National Savings and Investments). Premium '
+      'Bonds is a registered trademark of the Director of Savings.';
 
   static const String confirmWithNsi =
       'Always confirm results with NS&I before relying on them. Bondbell '

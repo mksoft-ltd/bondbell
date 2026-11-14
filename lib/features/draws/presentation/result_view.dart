@@ -197,29 +197,33 @@ class _WinRow extends StatelessWidget {
             // Bond and prize share a line when they fit; at large text sizes
             // the prize drops to its own line rather than overflowing or
             // being cut off.
-            Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 12,
-              runSpacing: 2,
-              children: <Widget>[
-                SelectableText(
-                  win.bond,
-                  style: t.textTheme.titleMedium?.copyWith(
-                    fontFeatures: const <FontFeature>[
-                      FontFeature.tabularFigures(),
-                    ],
-                    letterSpacing: 1,
+            SizedBox(
+              // Full width, so spaceBetween puts the amount at the right edge.
+              width: double.infinity,
+              child: Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 2,
+                children: <Widget>[
+                  SelectableText(
+                    win.bond,
+                    style: t.textTheme.titleMedium?.copyWith(
+                      fontFeatures: const <FontFeature>[
+                        FontFeature.tabularFigures(),
+                      ],
+                      letterSpacing: 1,
+                    ),
                   ),
-                ),
-                Text(
-                  gbp(win.prize),
-                  key: ValueKey<String>('prize-${win.holderId}-${win.bond}'),
-                  style: t.textTheme.titleLarge?.copyWith(
-                    color: t.colorScheme.secondary,
+                  Text(
+                    gbp(win.prize),
+                    key: ValueKey<String>('prize-${win.holderId}-${win.bond}'),
+                    style: t.textTheme.titleLarge?.copyWith(
+                      color: t.colorScheme.secondary,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             if (win.anonymous)
               Text(

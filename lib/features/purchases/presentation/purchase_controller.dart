@@ -31,6 +31,10 @@ enum PurchaseNotice {
   /// A tip left unfinished by an earlier session blocked this one; it has
   /// now been cleared, so the user can simply try again.
   tipCleared,
+
+  /// "Already owned" turned out to be an earlier order of the same item
+  /// that the store is still waiting to approve (code review N2).
+  pendingEarlier,
   cancelled,
   failed,
   pending,
@@ -89,6 +93,10 @@ class PurchaseController extends Notifier<PurchaseState> {
   Timer? _busyTimer;
   bool _restoring = false;
   bool _restoreFound = false;
+
+  /// A restore (user or recovery) delivered a purchase the store still
+  /// holds as pending.
+  bool _sawPending = false;
 
   /// Play reports a cancelled or failed purchase with an EMPTY product id;
   /// such an event belongs to the purchase in flight, and only to it.
@@ -212,6 +220,7 @@ class PurchaseController extends Notifier<PurchaseState> {
     _setBusy();
     _restoring = true;
     _restoreFound = false;
+    _sawPending = false;
     try {
       if (!await _store.isAvailable()) {
         _restoring = false;
@@ -227,7 +236,13 @@ class PurchaseController extends Notifier<PurchaseState> {
     if (!ref.mounted) return;
     final bool found = _restoreFound;
     _restoring = false;
-    if (!found) _finish(PurchaseNotice.nothingToRestore);
+    if (!found) {
+      _finish(
+        _sawPending
+            ? PurchaseNotice.pendingEarlier
+            : PurchaseNotice.nothingToRestore,
+      );
+    }
   }
 
   Future<void> _onPurchases(List<PurchaseDetails> list) async {
@@ -241,9 +256,15 @@ class PurchaseController extends Notifier<PurchaseState> {
         case PurchaseStatus.purchased:
         case PurchaseStatus.restored:
           if (_isPlayPending(p)) {
-            // Only tell the user when they asked (a buy or Restore). The
-            // silent launch restore re-reports a pending Play order on
-            // every launch, which would nag (review n4).
+            if (_restoring) {
+              // Restore/recovery reports it when its window closes, with
+              // the right words (review N2).
+              _sawPending = true;
+              break;
+            }
+            // Only tell the user when they asked (a buy). The silent
+            // launch restore re-reports a pending Play order on every
+            // launch, which would nag (review n4).
             if (state.busy) _finish(PurchaseNotice.pending);
             break;
           }
@@ -272,6 +293,10 @@ class PurchaseController extends Notifier<PurchaseState> {
             }
           }
         case PurchaseStatus.pending:
+          if (_restoring) {
+            _sawPending = true;
+            break;
+          }
           _finish(PurchaseNotice.pending);
         case PurchaseStatus.canceled:
           if (p.pendingCompletePurchase) await _complete(p);
@@ -304,6 +329,7 @@ class PurchaseController extends Notifier<PurchaseState> {
     final bool wasRestoring = _restoring;
     _restoring = true;
     _restoreFound = false;
+    _sawPending = false;
     try {
       await _store.restorePurchases();
       await Future<void>.delayed(restoreWindow);
@@ -312,9 +338,16 @@ class PurchaseController extends Notifier<PurchaseState> {
     }
     if (!ref.mounted) return;
     final bool found = _restoreFound;
+    final bool pending = _sawPending;
     _restoring = wasRestoring;
     if (pro && found) return; // "restored" was already shown.
-    _finish(pro ? PurchaseNotice.failed : PurchaseNotice.tipCleared);
+    _finish(
+      pending
+          ? PurchaseNotice.pendingEarlier
+          : pro
+          ? PurchaseNotice.failed
+          : PurchaseNotice.tipCleared,
+    );
   }
 
   Future<void> _quietRestore() async {

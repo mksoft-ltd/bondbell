@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/storage/local_store.dart';
+
 final NumberFormat _gbp = NumberFormat.currency(
   locale: 'en_GB',
   symbol: '£',
@@ -254,5 +256,24 @@ class MessageState extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// Runs a save; if the device refused the write, says so in a snackbar
+/// and returns false. Nothing was changed in that case (see
+/// [SaveFailedException]), so the user can simply try again.
+Future<bool> saveOrExplain(
+  BuildContext context,
+  Future<void> Function() save,
+) async {
+  final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+  try {
+    await save();
+    return true;
+  } on SaveFailedException {
+    messenger.showSnackBar(
+      const SnackBar(content: Text(SaveFailedException.message)),
+    );
+    return false;
   }
 }

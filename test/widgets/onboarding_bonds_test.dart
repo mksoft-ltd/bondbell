@@ -4,6 +4,7 @@ import 'package:bondbell/features/settings/presentation/app_settings.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../helpers/app_harness.dart';
 
@@ -160,6 +161,36 @@ void main() {
       tester.widget<TextField>(field('Last bond number (optional)')).onSubmitted!('');
       await tester.pumpAndSettle();
       expect(h.container.read(holdersProvider).single.ranges, hasLength(1));
+    });
+
+    // Regression (code review N1): a failed write used to be silent; the
+    // sheet closed and the range showed as saved until the next launch.
+    testWidgets('a save the device refuses is explained; the sheet stays open '
+        'and Save works again', (WidgetTester tester) async {
+      late FailingStore store;
+      final Harness h = await pumpBondbell(
+        tester,
+        prefs: <String, Object>{'real.holders': '[{"id":"me","name":"Me","ranges":[]}]'},
+        route: '/bonds',
+        localFactory: (SharedPreferences p) => store = FailingStore(p),
+      );
+      h.push('/holder/me');
+      await tester.pumpAndSettle();
+      await openSheet(tester);
+      await tester.enterText(field('First (or only) bond number'), '312KM104000');
+      await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+      await tester.pumpAndSettle();
+      expect(store.refused, 1);
+      expect(find.textContaining("couldn't save this change"), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'Save'), findsOneWidget,
+          reason: 'the sheet is still open');
+      expect(h.container.read(holdersProvider).single.ranges, isEmpty,
+          reason: 'not shown as saved');
+      store.fail = false;
+      await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+      await tester.pumpAndSettle();
+      expect(h.container.read(holdersProvider).single.ranges, hasLength(1));
+      expect(find.widgetWithText(FilledButton, 'Save'), findsNothing);
     });
 
     testWidgets('a reversed or cross-series range is refused',

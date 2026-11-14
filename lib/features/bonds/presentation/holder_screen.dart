@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/storage/local_store.dart';
 import '../../../shared/widgets/common.dart';
 import '../domain/holder.dart';
 import 'bonds_screen.dart';
@@ -47,7 +48,9 @@ class HolderScreen extends ConsumerWidget {
                 title: 'Rename holder',
                 initial: h.name,
               );
-              if (n != null) await ctrl.rename(h.id, n);
+              if (n != null && context.mounted) {
+                await saveOrExplain(context, () => ctrl.rename(h.id, n));
+              }
             },
           ),
           IconButton(
@@ -75,9 +78,12 @@ class HolderScreen extends ConsumerWidget {
                   ],
                 ),
               );
-              if (ok == true) {
-                await ctrl.deleteHolder(h.id);
-                if (context.mounted) context.pop();
+              if (ok == true && context.mounted) {
+                final bool done = await saveOrExplain(
+                  context,
+                  () => ctrl.deleteHolder(h.id),
+                );
+                if (done && context.mounted) context.pop();
               }
             },
           ),
@@ -169,9 +175,12 @@ class _RangeTile extends ConsumerWidget {
               existing: range,
             );
           } else {
-            await ref
-                .read(holdersProvider.notifier)
-                .deleteRange(holder.id, range.id);
+            await saveOrExplain(
+              context,
+              () => ref
+                  .read(holdersProvider.notifier)
+                  .deleteRange(holder.id, range.id),
+            );
           }
         },
         itemBuilder: (_) => const <PopupMenuEntry<String>>[
@@ -252,8 +261,18 @@ class _RangeSheetState extends ConsumerState<_RangeSheet> {
           r.end!,
         );
       }
+    } on SaveFailedException {
+      // Nothing was saved: keep the sheet open with the numbers in it so
+      // Save can simply be tapped again.
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          _error = SaveFailedException.message;
+        });
+      }
+      return;
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted && _saving) setState(() => _saving = false);
     }
     if (mounted) Navigator.of(context).pop();
   }

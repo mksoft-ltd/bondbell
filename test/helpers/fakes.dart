@@ -9,6 +9,10 @@ import 'package:bondbell/features/draws/data/nsi_index.dart';
 import 'package:bondbell/features/purchases/data/store_gateway.dart';
 import 'package:bondbell/features/reminders/reminder_service.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:in_app_purchase_android/billing_client_wrappers.dart'
+    show PurchaseStateWrapper, PurchaseWrapper;
+import 'package:in_app_purchase_android/in_app_purchase_android.dart'
+    show GooglePlayPurchaseDetails;
 
 /// A stand-in for the native `in_app_purchase` plugin. Every outcome is
 /// delivered the way the plugin delivers it: on [purchaseStream], after the
@@ -148,6 +152,25 @@ PurchaseDetails playAlreadyOwned() {
   );
   return p;
 }
+
+/// A Play order still awaiting payment (cash, slow card), as a restore
+/// delivers it: status `restored`, purchaseState pending, not acknowledged.
+PurchaseDetails playPendingRestored(String productId) =>
+    GooglePlayPurchaseDetails.fromPurchase(
+      PurchaseWrapper(
+        orderId: 'GPA.pending-$productId',
+        packageName: 'com.froggyeye.bondbell',
+        purchaseTime: 0,
+        purchaseToken: 'token-$productId',
+        signature: '',
+        products: <String>[productId],
+        isAutoRenewing: false,
+        originalJson: '{}',
+        isAcknowledged: false,
+        purchaseState: PurchaseStateWrapper.pending,
+      ),
+    ).single
+      ..status = PurchaseStatus.restored;
 
 /// One purchase update as the plugin would deliver it.
 PurchaseDetails purchaseUpdate(
