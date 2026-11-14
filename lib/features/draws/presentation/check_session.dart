@@ -190,9 +190,8 @@ class CheckSessionController extends Notifier<CheckSessionState> {
       }
       final String drawId = request.drawId ?? '';
       final RemoteList? list = switch (request.kind) {
-        CheckKind.draw => index.draws
-            .where((RemoteList l) => l.id == drawId)
-            .firstOrNull,
+        CheckKind.draw =>
+          index.draws.where((RemoteList l) => l.id == drawId).firstOrNull,
         _ => index.unclaimed,
       };
       if (list == null) {
@@ -290,7 +289,8 @@ class CheckSessionController extends Notifier<CheckSessionState> {
       if (summary.numbersScanned == 0) {
         state = state.copyWith(
           phase: CheckPhase.failed,
-          error: 'Bondbell couldn\'t read any bond numbers from NS&I\'s file. '
+          error:
+              'Bondbell couldn\'t read any bond numbers from NS&I\'s file. '
               'Its format may have changed. Please check on NS&I\'s site '
               'instead.',
           layoutChanged: true,
@@ -391,10 +391,7 @@ class CheckSessionController extends Notifier<CheckSessionState> {
     return null;
   }
 
-  static List<ScanTarget> _targets(
-    CheckRequest request,
-    List<Holder> holders,
-  ) {
+  static List<ScanTarget> _targets(CheckRequest request, List<Holder> holders) {
     if (request.kind == CheckKind.unclaimedSingle) {
       final BondNumber n = request.single!;
       return <ScanTarget>[
@@ -423,14 +420,15 @@ class CheckSessionController extends Notifier<CheckSessionState> {
       for (final Holder h in holders) h.id: h.name,
     };
     final List<Win> wins = <Win>[
-      for (final ScanHit hit in s.hits)
-        for (final String id in hit.holderIds)
+      for (int i = 0; i < s.hits.length; i++)
+        for (final String id in s.hits[i].holderIds)
           Win(
-            bond: hit.bond,
-            prize: hit.prize,
+            hit: i,
+            bond: s.hits[i].bond,
+            prize: s.hits[i].prize,
             holderId: id,
             holderName: names[id] ?? 'The number you entered',
-            anonymous: hit.anonymous,
+            anonymous: s.hits[i].anonymous,
           ),
     ]..sort((Win a, Win b) => b.prize.compareTo(a.prize));
     final bool single = request.kind == CheckKind.unclaimedSingle;

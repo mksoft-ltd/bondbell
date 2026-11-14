@@ -143,16 +143,24 @@ purchase, scheduling reminders in the device's zone, an exclusive range end,
 and disabling the per-tier integrity check each made the matching tests
 fail.
 
-## Known issues (found here, not fixed: outside this stage's lane)
+## Known issues
+
+Fix round (14 Nov 2026) resolved every issue found here except the
+by-design one. Each behaviour fix has a regression test that was verified
+to fail against the reintroduced defect on an isolated copy.
+
+| Was | Resolution | Pinned by |
+|---|---|---|
+| Win row overflowed at 2.0× text (six-figure prize) | Bond and prize share a `Wrap`; the prize drops to its own line instead of overflowing | `layout_sweep_test.dart` (tolerance removed) |
+| History row trailing amount filled the tile at 2.0× | Custom row: amount wraps under the month; only the chevron trails | `layout_sweep_test.dart` (tolerance removed) |
+| Same bond under two holders double-counted | A bond wins once: `Win.hit` identifies the list entry; `prizeCount` / `totalWon` / History stats count unique entries; per-holder lists note "Also listed under …" | `check_session_test` "a bond saved under two holders wins once", `check_models_test`, `check_result_test` headline test |
+| Android tip acknowledged but never consumed | Tips bought with `autoConsume: false`; every tip delivery (stream, launch restore, restore) goes through `StoreGateway.finishConsumable` (Play: `consumePurchase`) | `purchase_controller_test` "an acknowledged-but-unconsumed tip is consumed" (restore, stream, Android launch) |
+| ZIP-magic check skipped a <2-byte first chunk | First bytes buffered until two arrive; anything not starting `PK` (or under two bytes) gives "NS&I returned a web page instead of the file…" | `draw_source_test` 1-byte-chunk tests |
+| Sample labels inconsistent; "0.0 MB" | Every sample label is "<Month Year> (sample)"; sizes under 0.1 MB read in KB | `screenshot_seed_test`, `formatting_test` |
+| (new) "this phone" on iPad | `deviceNoun()`: iPad / tablet / phone, everywhere the device is named | `onboarding_bonds_test` page-2 wording per platform and size |
 
 | Severity | Issue | Where |
 |---|---|---|
-| Medium | At 2.0× text on phones, the result win row overflows for a six-figure prize (prize text beside the bond number never shrinks). The test font draws glyphs 1 em wide, so 2.0× here roughly matches the largest iOS accessibility sizes on a real iPhone SE. | `lib/features/draws/presentation/result_view.dart` `_WinRow` |
-| Low | At 2.0× text on a small phone, a History row's trailing amount + chevron takes the whole tile width (ListTile assertion). Likely only at the largest accessibility sizes on device. | `lib/features/history/history_screen.dart` |
-| Low–Medium | The same bond saved under two holders is reported for both, so totals double (one £100 prize shows as "2 prizes worth £200"). The overlap warning is shown at entry. Product decision. | `check_session.dart` `_record` |
-| Low | Android: a tip whose purchase update was never processed (app killed) comes back on restore as `restored`; it is acknowledged but never consumed, so that tip size stays "owned" and can't be bought again. Needs `consumePurchase` through the gateway. | `purchase_controller.dart` |
-| Low | The ZIP-magic check skips a first chunk shorter than 2 bytes and then tests the next chunk's start; a non-ZIP still fails later in the ZIP reader, with a less specific message. | `draw_source.dart` `download` |
-| Low (cosmetic) | Sample labels are inconsistent: History shows "Sample" next to "October 2026 (sample)", and the result says "in the Sample draw". Sample download size reads "0.0 MB" (already reported by design). | `screenshot_seed.dart`, `SampleDrawSource` |
 | By design | Pro is grant-only; a store refund never revokes it. | `purchase_controller.dart` |
 
 ## Not covered, and why

@@ -60,16 +60,15 @@ class ResultView extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
         ],
-        for (final MapEntry<String, List<Win>> e in byHolder.entries) ...<
-          Widget
-        >[
+        for (final MapEntry<String, List<Win>> e
+            in byHolder.entries) ...<Widget>[
           SectionCard(
             title: e.key,
             icon: Icons.person_outline,
             child: Column(
               children: <Widget>[
                 for (final Win w in e.value)
-                  _WinRow(win: w, unclaimed: _unclaimed),
+                  _WinRow(win: w, alsoUnder: record.alsoListedUnder(w)),
               ],
             ),
           ),
@@ -107,12 +106,10 @@ class _Headline extends StatelessWidget {
     final ThemeData t = Theme.of(context);
     final bool won = record.hasWins;
     final String title = !won
-        ? (unclaimed
-              ? 'Nothing unclaimed found'
-              : 'No prizes this time')
+        ? (unclaimed ? 'Nothing unclaimed found' : 'No prizes this time')
         : unclaimed
-        ? 'Found ${record.wins.length} unclaimed '
-              '${record.wins.length == 1 ? 'prize' : 'prizes'}'
+        ? 'Found ${record.prizeCount} unclaimed '
+              '${record.prizeCount == 1 ? 'prize' : 'prizes'}'
         : 'Congratulations!';
     final String sub = !won
         ? (record.singleNumber != null
@@ -123,8 +120,8 @@ class _Headline extends StatelessWidget {
                     'list. Every bond stays in the draw for next month.')
         : unclaimed
         ? 'Worth ${gbp(record.totalWon)} in total, waiting to be claimed.'
-        : 'You have ${record.wins.length} '
-              '${record.wins.length == 1 ? 'prize' : 'prizes'} worth '
+        : 'You have ${record.prizeCount} '
+              '${record.prizeCount == 1 ? 'prize' : 'prizes'} worth '
               '${gbp(record.totalWon)} in the ${record.label} draw.';
     return Card(
       color: won ? t.colorScheme.secondaryContainer : null,
@@ -147,7 +144,11 @@ class _Headline extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            Text(sub, textAlign: TextAlign.center, style: t.textTheme.bodyLarge),
+            Text(
+              sub,
+              textAlign: TextAlign.center,
+              style: t.textTheme.bodyLarge,
+            ),
           ],
         ),
       ),
@@ -156,48 +157,63 @@ class _Headline extends StatelessWidget {
 }
 
 class _WinRow extends StatelessWidget {
-  const _WinRow({required this.win, required this.unclaimed});
+  const _WinRow({required this.win, required this.alsoUnder});
   final Win win;
-  final bool unclaimed;
+
+  /// Other holders the same prize is listed under (a bond saved twice).
+  final List<String> alsoUnder;
 
   @override
   Widget build(BuildContext context) {
     final ThemeData t = Theme.of(context);
+    final String also = alsoUnder.isEmpty
+        ? ''
+        : 'Also listed under ${alsoUnder.join(' and ')}. It is one prize, '
+              'counted once in the total.';
     return Semantics(
-      label: 'Bond ${win.bond.split('').join(' ')}, prize ${gbp(win.prize)}',
+      label:
+          'Bond ${win.bond.split('').join(' ')}, prize ${gbp(win.prize)}'
+          '${win.anonymous ? '. Holder\'s name unknown to NS&I' : ''}'
+          '${also.isEmpty ? '' : '. $also'}',
       excludeSemantics: true,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  SelectableText(
-                    win.bond,
-                    style: t.textTheme.titleMedium?.copyWith(
-                      fontFeatures: const <FontFeature>[
-                        FontFeature.tabularFigures(),
-                      ],
-                      letterSpacing: 1,
-                    ),
+            // Bond and prize share a line when they fit; at large text sizes
+            // the prize drops to its own line rather than overflowing or
+            // being cut off.
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 12,
+              runSpacing: 2,
+              children: <Widget>[
+                SelectableText(
+                  win.bond,
+                  style: t.textTheme.titleMedium?.copyWith(
+                    fontFeatures: const <FontFeature>[
+                      FontFeature.tabularFigures(),
+                    ],
+                    letterSpacing: 1,
                   ),
-                  if (win.anonymous)
-                    Text(
-                      'Listed by NS&I as a prize whose holder\'s name is '
-                      'unknown',
-                      style: t.textTheme.bodySmall,
-                    ),
-                ],
-              ),
+                ),
+                Text(
+                  gbp(win.prize),
+                  key: ValueKey<String>('prize-${win.holderId}-${win.bond}'),
+                  style: t.textTheme.titleLarge?.copyWith(
+                    color: t.colorScheme.secondary,
+                  ),
+                ),
+              ],
             ),
-            Text(
-              gbp(win.prize),
-              style: t.textTheme.titleLarge?.copyWith(
-                color: t.colorScheme.secondary,
+            if (win.anonymous)
+              Text(
+                'Listed by NS&I as a prize whose holder\'s name is unknown',
+                style: t.textTheme.bodySmall,
               ),
-            ),
+            if (also.isNotEmpty) Text(also, style: t.textTheme.bodySmall),
           ],
         ),
       ),

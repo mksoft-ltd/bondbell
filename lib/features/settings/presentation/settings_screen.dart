@@ -123,8 +123,7 @@ class SettingsScreen extends ConsumerWidget {
                   icon: Icons.open_in_new,
                   title: 'NS&I\'s winning numbers page',
                   external: true,
-                  onTap: () =>
-                      openUrl(context, AppConstants.nsiDownloadsPage),
+                  onTap: () => openUrl(context, AppConstants.nsiDownloadsPage),
                 ),
               ],
             ),
@@ -149,9 +148,9 @@ class SettingsScreen extends ConsumerWidget {
       context: context,
       builder: (BuildContext c) => AlertDialog(
         title: const Text('Delete all your data?'),
-        content: const Text(
+        content: Text(
           'This removes every holder, bond number and saved result from '
-          'this phone. It can\'t be undone. Purchases aren\'t affected and '
+          'this ${deviceNoun(c)}. It can\'t be undone. Purchases aren\'t affected and '
           'can be restored.',
         ),
         actions: <Widget>[

@@ -4,6 +4,7 @@ import 'package:bondbell/app/debug_flags.dart';
 import 'package:bondbell/app/screenshot_seed.dart';
 import 'package:bondbell/core/storage/local_store.dart';
 import 'package:bondbell/features/draws/domain/check_models.dart';
+import 'package:bondbell/features/draws/data/draw_source.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -56,5 +57,15 @@ void main() {
     expect(recs, hasLength(6));
     // The headline sample result: £100 + £25, as the sample ZIP produces.
     expect(recs.firstWhere((CheckRecord r) => r.listId == '2026-11').totalWon, 125);
+    // One wording for every sample label (fix round, item 6).
+    for (final CheckRecord r in recs) {
+      expect(r.label, matches(RegExp(r'^[A-Z][a-z]+ \d{4} \(sample\)$')));
+    }
+    expect(
+      recs.firstWhere((CheckRecord r) => r.listId == '2026-11').label,
+      SampleDrawSource.index.latest!.label,
+      reason: 'the seeded result and a live sample check use the same label',
+    );
+    expect(SampleDrawSource.index.unclaimed!.label, endsWith('(sample)'));
   });
 }

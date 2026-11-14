@@ -116,7 +116,7 @@ void main() {
     expect(find.text('Check your bonds without logging in'), findsOneWidget);
     await tester.tap(find.text('Next'));
     await tester.pumpAndSettle();
-    expect(find.text('Your numbers stay on this phone'), findsOneWidget);
+    expect(find.textContaining('Your numbers stay on this '), findsOneWidget);
     await shot('02_onboarding_privacy');
 
     // ── Seed exactly as main() does under SCREENSHOT_MODE. ──

@@ -51,9 +51,10 @@ void main() {
   late Directory dir;
   late FakeSource source;
 
-  Future<ProviderContainer> container({bool pro = false}) async {
+  Future<ProviderContainer> container({bool pro = false, String? holders}) async {
     SharedPreferences.setMockInitialValues(<String, Object>{
-      'real.holders': '[{"id":"h","name":"Me","ranges":['
+      'real.holders': holders ??
+          '[{"id":"h","name":"Me","ranges":['
           '{"id":"r1","start":"312KM104000","end":"312KM104499"},'
           '{"id":"r2","start":"47DW185520","end":"47DW185569"}]}]',
     });
@@ -89,6 +90,35 @@ void main() {
     expect(c.read(recordsProvider)['2026-11']!.wins, hasLength(2));
     expect(source.handedOut.single.existsSync(), isFalse,
         reason: 'the downloaded list must be deleted after the check');
+  });
+
+  // Regression (fix round, item 1): a bond saved under two holders used to
+  // be counted once per holder ("3 prizes worth £225" for £100 + £25).
+  test('a bond saved under two holders wins once', () async {
+    final ProviderContainer c = await container(
+      pro: true,
+      holders: '[{"id":"h","name":"Me","ranges":['
+          '{"id":"r1","start":"312KM104000","end":"312KM104499"}]},'
+          '{"id":"g","name":"Gran","ranges":['
+          '{"id":"r9","start":"312KM104217","end":"312KM104217"}]}]',
+    );
+    final CheckSessionController s = c.read(checkSessionProvider.notifier);
+    await s.prepare(const CheckRequest.draw('latest'));
+    await s.start();
+    final CheckRecord r = c.read(checkSessionProvider).record!;
+    // Listed under both holders...
+    expect(r.wins.where((Win w) => w.bond == '312KM104217').map((Win w) => w.holderName),
+        unorderedEquals(<String>['Me', 'Gran']));
+    // ...but one prize: £100 + £25, two prizes.
+    expect(r.prizeCount, 2);
+    expect(r.totalWon, 125);
+    final Win gran = r.wins.firstWhere((Win w) => w.holderId == 'g');
+    expect(r.alsoListedUnder(gran), <String>['Me']);
+    // The stored copy (what History and stats read) agrees.
+    final CheckRecord stored = c.read(recordsProvider)['2026-11']!;
+    final CheckRecord back = CheckRecord.fromJson(stored.toJson());
+    expect(back.prizeCount, 2);
+    expect(back.totalWon, 125);
   });
 
   test('free tier cannot check an earlier draw or bulk unclaimed', () async {

@@ -13,7 +13,7 @@ import '../purchases/presentation/purchase_controller.dart';
 class WinStats {
   WinStats(List<CheckRecord> draws, this.heldNow)
     : drawsChecked = draws.length,
-      prizes = draws.fold(0, (int a, CheckRecord r) => a + r.wins.length),
+      prizes = draws.fold(0, (int a, CheckRecord r) => a + r.prizeCount),
       totalWon = draws.fold(0, (int a, CheckRecord r) => a + r.totalWon);
 
   final int drawsChecked;
@@ -45,7 +45,8 @@ class HistoryScreen extends ConsumerWidget {
             MessageState(
               icon: Icons.insights_outlined,
               title: 'History and stats are part of Pro',
-              body: 'Bondbell Pro keeps every result you check, adds up what '
+              body:
+                  'Bondbell Pro keeps every result you check, adds up what '
                   'you\'ve won, and shows how your prizes compare with the '
                   'amount you hold. Your latest draw result is always on the '
                   'Check tab, free.',
@@ -137,34 +138,9 @@ class HistoryScreen extends ConsumerWidget {
                 children: <Widget>[
                   for (int i = 0; i < draws.length; i++) ...<Widget>[
                     if (i > 0) const Divider(indent: 20, endIndent: 20),
-                    ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 4,
-                      ),
-                      title: Text(draws[i].label),
-                      subtitle: Text(
-                        draws[i].hasWins
-                            ? '${draws[i].wins.length} '
-                                  '${draws[i].wins.length == 1 ? 'prize' : 'prizes'}'
-                            : 'No prizes',
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
-                          Text(
-                            gbp(draws[i].totalWon),
-                            style: t.textTheme.titleMedium?.copyWith(
-                              color: draws[i].hasWins
-                                  ? t.colorScheme.secondary
-                                  : t.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          const Icon(Icons.chevron_right),
-                        ],
-                      ),
-                      onTap: () =>
-                          context.push('/result/${draws[i].listId}'),
+                    _HistoryRow(
+                      record: draws[i],
+                      onTap: () => context.push('/result/${draws[i].listId}'),
                     ),
                   ],
                 ],
@@ -172,6 +148,69 @@ class HistoryScreen extends ConsumerWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// One checked draw. The amount sits beside the month when there is room
+/// and drops below it at large text sizes, so neither is ever squeezed.
+class _HistoryRow extends StatelessWidget {
+  const _HistoryRow({required this.record, required this.onTap});
+  final CheckRecord record;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData t = Theme.of(context);
+    final String prizes = record.hasWins
+        ? '${record.prizeCount} ${record.prizeCount == 1 ? 'prize' : 'prizes'}'
+        : 'No prizes';
+    return Semantics(
+      button: true,
+      label: '${record.label}, $prizes, ${gbp(record.totalWon)}',
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 12, 14),
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 12,
+                      children: <Widget>[
+                        Text(record.label, style: t.textTheme.titleMedium),
+                        Text(
+                          gbp(record.totalWon),
+                          style: t.textTheme.titleMedium?.copyWith(
+                            color: record.hasWins
+                                ? t.colorScheme.secondary
+                                : t.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      prizes,
+                      style: t.textTheme.bodyMedium?.copyWith(
+                        color: t.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right),
+            ],
+          ),
+        ),
       ),
     );
   }

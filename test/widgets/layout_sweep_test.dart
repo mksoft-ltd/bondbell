@@ -132,16 +132,9 @@ void main() {
             await pumpFrames(tester, 3);
           });
         }
-        final bool knownIssuesApply =
-            scale >= 2.0 && size.value.width < 600;
-        final bool sawKnown = problems.any(
-          (String p) => _knownLargeText.any(p.startsWith),
-        );
-        final List<String> unexpected = <String>[
-          for (final String p in problems)
-            if (!(knownIssuesApply && _isKnownLargeTextIssue(p, sawKnown))) p,
-        ];
-        expect(unexpected, isEmpty, reason: unexpected.join('\n'));
+        // No tolerated overflows: the two 2.0x phone issues once pinned
+        // here (result win row, history row) were fixed in the fix round.
+        expect(problems, isEmpty, reason: problems.join('\n'));
       });
 
       testWidgets('${size.key} at ${scale}x text: onboarding fits',
@@ -164,21 +157,3 @@ void main() {
     }
   }
 }
-
-/// Layout defects found by this sweep at 2.0x text on phones, reported in
-/// docs/TEST_PLAN.md ("Known issues") and left to the design/build stage
-/// because the fix is layout, not logic. Matching is by screen + message so
-/// any NEW overflow still fails. Lines after a failed layout ("not laid
-/// out", framework assertions) are its cascade, not separate defects.
-const List<String> _knownLargeText = <String>[
-  // History row: the trailing "£100,025 >" Row is unconstrained.
-  '/history: Trailing widget consumes the entire tile width',
-  // Result win row: the prize Text beside the bond number never shrinks.
-  '/result/2026-11: A RenderFlex overflowed',
-];
-
-bool _isKnownLargeTextIssue(String p, bool sawKnown) =>
-    _knownLargeText.any(p.startsWith) ||
-    (sawKnown &&
-        (p.contains('RenderBox was not laid out') ||
-            p.contains('Failed assertion')));

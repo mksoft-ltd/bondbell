@@ -177,7 +177,7 @@ void main() {
   test('a download error (e.g. HTML instead of a ZIP) surfaces its message',
       () async {
     source.downloadError = const SourceException(
-      'NS&I\'s site sent a web page instead of the file.',
+      NsiDrawSource.webPageInsteadOfFile,
       layoutChanged: true,
     );
     final ProviderContainer c = await make();

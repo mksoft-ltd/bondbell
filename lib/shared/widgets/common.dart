@@ -12,8 +12,24 @@ final NumberFormat _count = NumberFormat.decimalPattern('en_GB');
 String gbp(int pounds) => _gbp.format(pounds);
 String countLabel(int n) => _count.format(n);
 
-String megabytes(int bytes) =>
-    '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+/// A download size people can read: KB below 0.1 MB, so a small file never
+/// shows as "0.0 MB".
+String megabytes(int bytes) {
+  const int mb = 1024 * 1024;
+  if (bytes < mb ~/ 10) {
+    final int kb = (bytes / 1024).ceil();
+    return '${kb < 1 ? 1 : kb} KB';
+  }
+  return '${(bytes / mb).toStringAsFixed(1)} MB';
+}
+
+/// What to call the device in copy: "iPad" on an iPad, "tablet" on a
+/// tablet-size Android device, "phone" otherwise.
+String deviceNoun(BuildContext context) {
+  final bool large = MediaQuery.sizeOf(context).shortestSide >= 600;
+  if (!large) return 'phone';
+  return Theme.of(context).platform == TargetPlatform.iOS ? 'iPad' : 'tablet';
+}
 
 /// Opens [url] in the browser; reports failure in a snackbar.
 Future<void> openUrl(BuildContext context, String url) async {
@@ -22,9 +38,9 @@ Future<void> openUrl(BuildContext context, String url) async {
     mode: LaunchMode.externalApplication,
   ).catchError((Object _) => false);
   if (!ok && context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Couldn\'t open $url')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Couldn\'t open $url')));
   }
 }
 
@@ -168,8 +184,10 @@ class SampleBanner extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
             child: Row(
               children: <Widget>[
-                Icon(Icons.science_outlined,
-                    color: t.colorScheme.onSecondaryContainer),
+                Icon(
+                  Icons.science_outlined,
+                  color: t.colorScheme.onSecondaryContainer,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: ExcludeSemantics(
@@ -217,11 +235,13 @@ class MessageState extends StatelessWidget {
         children: <Widget>[
           Icon(icon, size: 56, color: t.colorScheme.primary),
           const SizedBox(height: 16),
-          Text(title,
-              textAlign: TextAlign.center, style: t.textTheme.titleLarge),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: t.textTheme.titleLarge,
+          ),
           const SizedBox(height: 8),
-          Text(body,
-              textAlign: TextAlign.center, style: t.textTheme.bodyLarge),
+          Text(body, textAlign: TextAlign.center, style: t.textTheme.bodyLarge),
           if (actions.isNotEmpty) ...<Widget>[
             const SizedBox(height: 20),
             Wrap(

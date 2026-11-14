@@ -43,6 +43,41 @@ void main() {
         if (records.isNotEmpty) 'real.records': recordsJson(records),
       };
 
+  // Regression (fix round, item 1): the headline counted a bond saved under
+  // two holders twice.
+  testWidgets('a bond under two holders: one prize in the headline, shown '
+      'under both with a note', (WidgetTester tester) async {
+    final Holder gran = Holder(id: 'gran', name: 'Gran', ranges: meHolder.ranges);
+    final String fp2 = holdingsFingerprint(<Holder>[meHolder, gran]);
+    final CheckRecord r = CheckRecord(
+      listId: '2026-11',
+      label: 'November 2026',
+      checkedAt: DateTime.utc(2026, 11, 3, 9, 5),
+      fingerprint: fp2,
+      wins: const <Win>[
+        Win(bond: '312KM104217', prize: 100, holderId: 'me', holderName: 'Me', hit: 0),
+        Win(bond: '312KM104217', prize: 100, holderId: 'gran', holderName: 'Gran', hit: 0),
+      ],
+      numbersScanned: 6575175,
+      integrityOk: true,
+      bondsChecked: 2002,
+    );
+    await pumpBondbell(
+      tester,
+      prefs: <String, Object>{
+        'real.holders': holdersJson(<Holder>[meHolder, gran]),
+        'real.records': recordsJson(<CheckRecord>[r]),
+      },
+      route: '/result/2026-11',
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('You have 1 prize worth £100'), findsOneWidget);
+    expect(find.textContaining('2 prizes'), findsNothing);
+    expect(find.text('Gran'), findsOneWidget);
+    expect(find.textContaining('Also listed under Me'), findsOneWidget);
+    expect(find.textContaining('Also listed under Gran'), findsOneWidget);
+  });
+
   group('check flow states', () {
     late ScriptedCheckSession session;
 

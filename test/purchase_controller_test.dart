@@ -465,7 +465,7 @@ void main() {
             purchaseUpdate(tip, PurchaseStatus.purchased),
           ]);
           clock.flushMicrotasks();
-          expect(store.completed.single.productID, tip);
+          expect(store.consumed.single.productID, tip);
           expect(st(c).notice, PurchaseNotice.tipThanks);
           expect(st(c).busy, isFalse);
           expect(st(c).proOwned, isFalse);
@@ -486,22 +486,68 @@ void main() {
           clock.flushMicrotasks();
         }
         expect(store.consumableBuys, hasLength(2));
-        expect(store.completed, hasLength(2));
+        expect(store.consumed, hasLength(2));
       });
     });
 
-    test('a restored tip is finished silently and grants nothing', () {
+    test('a restored tip is consumed silently and grants nothing', () {
       store.onRestore = () => <PurchaseDetails>[
         purchaseUpdate(AppConstants.tipLargeId, PurchaseStatus.restored),
       ];
       run((FakeAsync clock, ProviderContainer c) {
         ctrl(c).restore();
         clock.flushMicrotasks();
-        expect(store.completed.single.productID, AppConstants.tipLargeId);
+        expect(store.consumed.single.productID, AppConstants.tipLargeId);
         expect(st(c).proOwned, isFalse);
         clock.elapse(PurchaseController.restoreWindow);
         expect(st(c).notice, PurchaseNotice.nothingToRestore,
             reason: 'a tip is not a Pro purchase to restore');
+      });
+    });
+
+    // Regression (fix round, item 2): a tip whose update was never processed
+    // (app killed) comes back already ACKNOWLEDGED, i.e. with
+    // pendingCompletePurchase false. It used to be skipped, so it was never
+    // consumed and that tip size stayed "owned" on Play for ever.
+    group('an acknowledged-but-unconsumed tip is consumed', () {
+      PurchaseDetails leftover(PurchaseStatus s) =>
+          purchaseUpdate(AppConstants.tipMediumId, s, pendingComplete: false);
+
+      test('when restore delivers it', () {
+        store.onRestore = () => <PurchaseDetails>[
+          leftover(PurchaseStatus.restored),
+        ];
+        run((FakeAsync clock, ProviderContainer c) {
+          ctrl(c).restore();
+          clock.flushMicrotasks();
+          expect(store.consumed.single.productID, AppConstants.tipMediumId);
+          clock.elapse(PurchaseController.restoreWindow);
+          expect(st(c).proOwned, isFalse);
+          expect(c.read(isProProvider), isFalse);
+        });
+      });
+
+      test('when the purchase stream delivers it after a relaunch', () {
+        run((FakeAsync clock, ProviderContainer c) {
+          store.emit(<PurchaseDetails>[leftover(PurchaseStatus.purchased)]);
+          clock.flushMicrotasks();
+          expect(store.consumed.single.productID, AppConstants.tipMediumId);
+          expect(st(c).proOwned, isFalse);
+          expect(local.getBool(PurchaseController.proKey), isNull);
+        });
+      });
+
+      test('at launch on Android (silent restore)', () {
+        debugDefaultTargetPlatformOverride = TargetPlatform.android;
+        store.onRestore = () => <PurchaseDetails>[
+          leftover(PurchaseStatus.restored),
+        ];
+        run((FakeAsync clock, ProviderContainer c) {
+          expect(store.restoreCalls, 1);
+          expect(store.consumed.single.productID, AppConstants.tipMediumId);
+          expect(st(c).proOwned, isFalse);
+          expect(st(c).notice, isNull, reason: 'silent: no thanks, no error');
+        });
       });
     });
 

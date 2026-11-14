@@ -102,8 +102,9 @@ class NsiDrawSource implements DrawSource {
     final http.Client c = _clientFactory();
     try {
       final Uri page = Uri.parse(AppConstants.nsiDownloadsPage);
-      final http.Response r =
-          await c.get(page, headers: _headers).timeout(_timeout);
+      final http.Response r = await c
+          .get(page, headers: _headers)
+          .timeout(_timeout);
       if (r.statusCode != 200) {
         throw SourceException(
           'NS&I\'s site answered with an error (${r.statusCode}). '
@@ -142,8 +143,9 @@ class NsiDrawSource implements DrawSource {
   Future<int?> sizeOf(RemoteList list) async {
     final http.Client c = _clientFactory();
     try {
-      final http.Response r =
-          await c.head(list.url, headers: _headers).timeout(_timeout);
+      final http.Response r = await c
+          .head(list.url, headers: _headers)
+          .timeout(_timeout);
       if (r.statusCode != 200) return null;
       return int.tryParse(r.headers['content-length'] ?? '');
     } on Object {
@@ -152,6 +154,18 @@ class NsiDrawSource implements DrawSource {
       c.close();
     }
   }
+
+  /// Not starting with "PK" means NS&I (or something in between, such as
+  /// a bot-protection page) answered with something other than the file.
+  static void _checkZipMagic(List<int> head) {
+    if (head.length >= 2 && head[0] == 0x50 && head[1] == 0x4b) return;
+    throw const SourceException(webPageInsteadOfFile, layoutChanged: true);
+  }
+
+  static const String webPageInsteadOfFile =
+      'NS&I returned a web page instead of the file. Their site may be busy '
+      'or checking for automated traffic. Try again later, or open their '
+      'page.';
 
   @override
   Future<File> download(
@@ -178,37 +192,41 @@ class NsiDrawSource implements DrawSource {
       }
       final String type = r.headers['content-type'] ?? '';
       if (type.contains('html')) {
-        throw const SourceException(
-          'NS&I\'s site sent a web page instead of the file. It may be '
-          'busy or checking for automated traffic. Try again later, or open '
-          'their page.',
-          layoutChanged: true,
-        );
+        throw const SourceException(webPageInsteadOfFile, layoutChanged: true);
       }
       final int? total = r.contentLength;
       sink = out.openWrite();
       int received = 0;
+      // The first bytes must be the ZIP signature "PK". They are held back
+      // until at least two have arrived, however the server splits its
+      // chunks (a 1-byte first chunk must not skip the check).
+      final List<int> head = <int>[];
       bool checkedMagic = false;
       await for (final List<int> chunk in r.stream.timeout(_timeout)) {
         if (cancel?.isCancelled ?? false) {
           throw const DownloadCancelledException();
         }
-        if (!checkedMagic && chunk.length >= 2) {
-          checkedMagic = true;
-          if (chunk[0] != 0x50 || chunk[1] != 0x4b) {
-            throw const SourceException(
-              'The file from NS&I isn\'t a ZIP archive as expected.',
-              layoutChanged: true,
-            );
-          }
-        }
-        sink.add(chunk);
         received += chunk.length;
+        if (!checkedMagic) {
+          head.addAll(chunk);
+          if (head.length < 2) continue;
+          checkedMagic = true;
+          _checkZipMagic(head);
+          sink.add(head);
+        } else {
+          sink.add(chunk);
+        }
         onProgress?.call(received, total);
+      }
+      // A response shorter than two bytes never reached the check.
+      if (!checkedMagic && !(cancel?.isCancelled ?? false)) {
+        _checkZipMagic(head);
       }
       await sink.close();
       sink = null;
-      if (cancel?.isCancelled ?? false) throw const DownloadCancelledException();
+      if (cancel?.isCancelled ?? false) {
+        throw const DownloadCancelledException();
+      }
       if (total != null && received != total) {
         throw const SourceException(
           'The download stopped part-way. Check your connection and try '
@@ -219,7 +237,9 @@ class NsiDrawSource implements DrawSource {
     } on Object catch (e) {
       await sink?.close().catchError((Object _) {});
       if (out.existsSync()) out.deleteSync();
-      if (cancel?.isCancelled ?? false) throw const DownloadCancelledException();
+      if (cancel?.isCancelled ?? false) {
+        throw const DownloadCancelledException();
+      }
       if (e is SourceException || e is DownloadCancelledException) rethrow;
       debugPrint('download: $e');
       if (e is TimeoutException) {
@@ -254,13 +274,13 @@ class SampleDrawSource implements DrawSource {
     draws: <RemoteList>[
       RemoteList(
         id: sampleDrawId,
-        label: 'Sample',
+        label: 'November 2026 (sample)',
         url: Uri.parse('asset:///$winnersAsset'),
       ),
     ],
     unclaimed: RemoteList(
       id: 'unclaimed',
-      label: 'Sample unclaimed prizes list',
+      label: 'Unclaimed prizes list (sample)',
       url: Uri.parse('asset:///$unclaimedAsset'),
     ),
   );

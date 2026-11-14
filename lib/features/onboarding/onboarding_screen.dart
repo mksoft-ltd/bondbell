@@ -17,26 +17,27 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final PageController _pages = PageController();
   int _page = 0;
 
-  static const List<({IconData icon, String title, String body})> _steps =
-      <({IconData icon, String title, String body})>[
-        (
-          icon: Icons.notifications_active_outlined,
-          title: 'Check your bonds without logging in',
-          body:
-              'Save your Premium Bond numbers once, from a statement or old '
-              'paper certificates. Each month Bondbell checks them against '
-              'the winning numbers for you. It works for a relative\'s bonds '
-              'too.',
-        ),
-        (
-          icon: Icons.lock_outline,
-          title: 'Your numbers stay on this phone',
-          body:
-              'When you check, Bondbell downloads NS&I\'s public list '
-              'straight from nsandi.com and compares it here. No account, no '
-              'server of ours, no tracking.',
-        ),
-      ];
+  static List<({IconData icon, String title, String body})> _steps(
+    String device,
+  ) => <({IconData icon, String title, String body})>[
+    (
+      icon: Icons.notifications_active_outlined,
+      title: 'Check your bonds without logging in',
+      body:
+          'Save your Premium Bond numbers once, from a statement or old '
+          'paper certificates. Each month Bondbell checks them against '
+          'the winning numbers for you. It works for a relative\'s bonds '
+          'too.',
+    ),
+    (
+      icon: Icons.lock_outline,
+      title: 'Your numbers stay on this $device',
+      body:
+          'When you check, Bondbell downloads NS&I\'s public list '
+          'straight from nsandi.com and compares it here. No account, no '
+          'server of ours, no tracking.',
+    ),
+  ];
 
   @override
   void dispose() {
@@ -55,7 +56,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final ThemeData t = Theme.of(context);
-    final int count = _steps.length + 1;
+    final List<({IconData icon, String title, String body})> steps = _steps(
+      deviceNoun(context),
+    );
+    final int count = steps.length + 1;
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -65,7 +69,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 controller: _pages,
                 onPageChanged: (int p) => setState(() => _page = p),
                 children: <Widget>[
-                  for (final s in _steps)
+                  for (final s in steps)
                     _Page(icon: s.icon, title: s.title, body: s.body),
                   _Page(
                     icon: Icons.check_circle_outline,

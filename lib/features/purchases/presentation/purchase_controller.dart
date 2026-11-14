@@ -243,8 +243,10 @@ class PurchaseController extends Notifier<PurchaseState> {
               );
             }
           } else {
-            // A tip: nothing to grant. Finish it so it can be given again.
-            if (p.pendingCompletePurchase) await _complete(p);
+            // A tip grants nothing. Consume it whatever its history (fresh,
+            // left over from a killed session, or restored, even if
+            // already acknowledged) so that tip size can be given again.
+            await _finishTip(p);
             if (p.status == PurchaseStatus.purchased) {
               _finish(PurchaseNotice.tipThanks);
             }
@@ -278,6 +280,15 @@ class PurchaseController extends Notifier<PurchaseState> {
       p is GooglePlayPurchaseDetails &&
       p.billingClientPurchase.purchaseState == PurchaseStateWrapper.pending;
 
+  Future<void> _finishTip(PurchaseDetails p) async {
+    try {
+      await _store.finishConsumable(p);
+    } on Object catch (e) {
+      // Retried on the next launch/restore, which re-delivers it.
+      debugPrint('finishConsumable failed: $e');
+    }
+  }
+
   Future<void> _complete(PurchaseDetails p) async {
     try {
       await _store.completePurchase(p);
@@ -305,9 +316,7 @@ class PurchaseController extends Notifier<PurchaseState> {
 
 final NotifierProvider<PurchaseController, PurchaseState>
 purchaseControllerProvider =
-    NotifierProvider<PurchaseController, PurchaseState>(
-      PurchaseController.new,
-    );
+    NotifierProvider<PurchaseController, PurchaseState>(PurchaseController.new);
 
 /// The one gate every Pro feature reads.
 final Provider<bool> isProProvider = Provider<bool>(

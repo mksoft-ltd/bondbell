@@ -17,10 +17,11 @@ class AboutScreen extends StatelessWidget {
           Text('How Bondbell works', style: t.textTheme.titleLarge),
           const SizedBox(height: 8),
           Text(
-            'You save your bond numbers on this device. When you ask it to '
-            'check, Bondbell downloads NS&I\'s public list of winning numbers '
-            'directly from nsandi.com, compares it with your numbers on the '
-            'phone, keeps only the matches, and deletes the download.\n\n'
+            'You save your bond numbers on this ${deviceNoun(context)}. When '
+            'you ask it to check, Bondbell downloads NS&I\'s public list of '
+            'winning numbers directly from nsandi.com, compares it with your '
+            'numbers on the ${deviceNoun(context)}, keeps only the matches, '
+            'and deletes the download.\n\n'
             'Nothing you enter is sent anywhere. There\'s no account, no '
             'server of ours in the middle, no analytics and no ads.',
             style: t.textTheme.bodyLarge,

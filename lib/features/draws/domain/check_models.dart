@@ -11,6 +11,7 @@ class Win {
     required this.holderId,
     required this.holderName,
     this.anonymous = false,
+    this.hit,
   });
 
   final String bond;
@@ -19,12 +20,24 @@ class Win {
   final String holderName;
   final bool anonymous;
 
+  /// Which entry in NS&I's list this is (its position among the matches).
+  /// The same bond saved under two holders yields two [Win]s with the same
+  /// [hit]: one prize, shown under both. Records saved before this field
+  /// existed fall back to bond + prize.
+  final int? hit;
+
+  /// Identity of the prize itself, independent of who it is listed under.
+  /// Two genuinely separate prizes on one bond (possible in the unclaimed
+  /// list) have different [hit]s and stay separate.
+  String get prizeKey => hit != null ? 'h$hit' : '$bond:$prize';
+
   Map<String, Object?> toJson() => <String, Object?>{
     'bond': bond,
     'prize': prize,
     'holderId': holderId,
     'holderName': holderName,
     if (anonymous) 'anonymous': true,
+    if (hit != null) 'hit': hit,
   };
 
   factory Win.fromJson(Map<String, Object?> j) => Win(
@@ -33,6 +46,7 @@ class Win {
     holderId: j['holderId']! as String,
     holderName: j['holderName']! as String,
     anonymous: (j['anonymous'] as bool?) ?? false,
+    hit: j['hit'] as int?,
   );
 }
 
@@ -71,8 +85,29 @@ class CheckRecord {
   /// Unclaimed single-number search: the number that was looked up.
   final String? singleNumber;
 
-  int get totalWon => wins.fold(0, (int s, Win w) => s + w.prize);
+  /// One entry per prize: a bond number wins once, however many holders
+  /// it was saved under.
+  List<Win> get uniqueWins {
+    final Set<String> seen = <String>{};
+    return <Win>[
+      for (final Win w in wins)
+        if (seen.add(w.prizeKey)) w,
+    ];
+  }
+
+  /// Number of distinct prizes (see [uniqueWins]).
+  int get prizeCount => uniqueWins.length;
+
+  /// Total of distinct prizes; a bond listed under two holders counts once.
+  int get totalWon => uniqueWins.fold(0, (int s, Win w) => s + w.prize);
   bool get hasWins => wins.isNotEmpty;
+
+  /// For a win shown under one holder, the other holders the same prize is
+  /// also listed under (non-empty only when a bond was saved twice).
+  List<String> alsoListedUnder(Win w) => <String>[
+    for (final Win o in wins)
+      if (o.prizeKey == w.prizeKey && o.holderId != w.holderId) o.holderName,
+  ];
 
   Map<String, Object?> toJson() => <String, Object?>{
     'listId': listId,

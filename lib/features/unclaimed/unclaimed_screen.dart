@@ -153,8 +153,8 @@ class _LastResult extends StatelessWidget {
         ? 'Last search: ${record.singleNumber}'
         : 'Last search';
     final String outcome = record.hasWins
-        ? '${record.wins.length} unclaimed '
-              '${record.wins.length == 1 ? 'prize' : 'prizes'} '
+        ? '${record.prizeCount} unclaimed '
+              '${record.prizeCount == 1 ? 'prize' : 'prizes'} '
               '(${gbp(record.totalWon)})'
         : 'nothing found';
     return ListTile(

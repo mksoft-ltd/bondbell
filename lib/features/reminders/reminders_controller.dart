@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../shared/widgets/common.dart';
 import '../settings/presentation/app_settings.dart';
 import 'reminder_service.dart';
 
@@ -15,6 +16,7 @@ final Provider<bool> remindersEnabledProvider = Provider<bool>(
 Future<void> enableReminders(BuildContext context, WidgetRef ref) async {
   final ReminderService service = ref.read(reminderServiceProvider);
   final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+  final String device = deviceNoun(context);
   bool granted = false;
   try {
     granted = await service.requestPermission();
@@ -30,7 +32,7 @@ Future<void> enableReminders(BuildContext context, WidgetRef ref) async {
             ? 'Reminders are on. You\'ll hear from Bondbell at 9am on results '
                   'day.'
             : 'Notifications are turned off for Bondbell. You can allow them '
-                  'in your phone\'s Settings, then try again.',
+                  'in your $device\'s Settings, then try again.',
       ),
     ),
   );

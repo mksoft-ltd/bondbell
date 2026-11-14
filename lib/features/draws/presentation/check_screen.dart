@@ -102,9 +102,7 @@ class _CheckScreenState extends ConsumerState<CheckScreen> {
 
   Widget _body(BuildContext context, CheckSessionState s, bool sample) {
     final ThemeData t = Theme.of(context);
-    final CheckSessionController ctrl = ref.read(
-      checkSessionProvider.notifier,
-    );
+    final CheckSessionController ctrl = ref.read(checkSessionProvider.notifier);
     switch (s.phase) {
       case CheckPhase.idle:
       case CheckPhase.preparing:
@@ -149,9 +147,10 @@ class _CheckScreenState extends ConsumerState<CheckScreen> {
                 text: sample
                     ? 'Sample list bundled with the app; nothing is '
                           'downloaded.'
-                    : 'Downloaded straight from nsandi.com to this device, '
-                          'checked here, then deleted. Your numbers never '
-                          'leave your phone.',
+                    : 'Downloaded straight from nsandi.com to this '
+                          '${deviceNoun(context)}, checked here, then '
+                          'deleted. Your numbers never leave your '
+                          '${deviceNoun(context)}.',
               ),
               const SizedBox(height: 20),
               FilledButton.icon(
@@ -170,9 +169,7 @@ class _CheckScreenState extends ConsumerState<CheckScreen> {
       case CheckPhase.downloading:
         final int? size = s.sizeBytes;
         return _Working(
-          title: sample
-              ? 'Loading the sample list…'
-              : 'Downloading from NS&I…',
+          title: sample ? 'Loading the sample list…' : 'Downloading from NS&I…',
           detail: size == null
               ? '${(s.progress * 100).round()}%'
               : '${megabytes((size * s.progress).round())} of ${megabytes(size)}',
@@ -211,7 +208,8 @@ class _CheckScreenState extends ConsumerState<CheckScreen> {
         return MessageState(
           icon: Icons.stop_circle_outlined,
           title: 'Check stopped',
-          body: 'Nothing was saved, and any part-downloaded file has been '
+          body:
+              'Nothing was saved, and any part-downloaded file has been '
               'deleted.',
           actions: <Widget>[
             FilledButton(

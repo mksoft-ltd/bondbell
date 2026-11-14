@@ -205,7 +205,57 @@ void main() {
           headers: const <String, String>{'content-type': 'application/octet-stream'},
         )).download(list),
         throwsA(isA<SourceException>().having(
-            (SourceException e) => e.message, 'message', contains('ZIP'))),
+            (SourceException e) => e.message, 'message',
+            NsiDrawSource.webPageInsteadOfFile)),
+      );
+      expect(leftovers(), isEmpty);
+    });
+
+    // Regression (fix round, item 5): the check used to skip a first chunk
+    // shorter than two bytes and test the NEXT chunk's start instead, so a
+    // web page split as "<" + "!DOCTYPE…" got past it (and a real ZIP split
+    // as "P" + "K…" would have been rejected).
+    test('a web page whose first chunk is one byte is still recognised',
+        () async {
+      await expectLater(
+        source(streaming(
+          <List<int>>[
+            utf8.encode('<'),
+            utf8.encode('PK!DOCTYPE html><html>busy</html>'),
+          ],
+          headers: const <String, String>{'content-type': 'application/zip'},
+        )).download(list),
+        throwsA(isA<SourceException>()
+            .having((SourceException e) => e.message, 'message',
+                NsiDrawSource.webPageInsteadOfFile)
+            .having((SourceException e) => e.layoutChanged, 'layoutChanged',
+                isTrue)),
+      );
+      expect(leftovers(), isEmpty);
+    });
+
+    test('a real ZIP split into 1-byte first chunks downloads intact',
+        () async {
+      final File f = await source(streaming(
+        <List<int>>[
+          zip.sublist(0, 1),
+          zip.sublist(1, 2),
+          zip.sublist(2),
+        ],
+        headers: const <String, String>{'content-type': 'application/zip'},
+      )).download(list);
+      expect(f.readAsBytesSync(), zip);
+      f.deleteSync();
+    });
+
+    test('a one-byte response is not a ZIP', () async {
+      await expectLater(
+        source(streaming(
+          <List<int>>[utf8.encode('<')],
+          headers: const <String, String>{'content-type': 'application/zip'},
+        )).download(list),
+        throwsA(isA<SourceException>().having((SourceException e) => e.message,
+            'message', NsiDrawSource.webPageInsteadOfFile)),
       );
       expect(leftovers(), isEmpty);
     });

@@ -58,8 +58,9 @@ class HolderScreen extends ConsumerWidget {
                 context: context,
                 builder: (BuildContext c) => AlertDialog(
                   title: Text('Delete ${h.name}?'),
-                  content: const Text(
-                    'Their bond numbers are removed from this phone. Saved '
+                  content: Text(
+                    'Their bond numbers are removed from this '
+                    '${deviceNoun(c)}. Saved '
                     'results stay in your history.',
                   ),
                   actions: <Widget>[
@@ -107,7 +108,8 @@ class HolderScreen extends ConsumerWidget {
             MessageState(
               icon: Icons.post_add_outlined,
               title: 'Add their bond numbers',
-              body: 'Statements list bonds in ranges, like '
+              body:
+                  'Statements list bonds in ranges, like '
                   '688ZY673000 – 688ZY673999. Paper certificates show one '
                   'number or a short run.',
               actions: <Widget>[
@@ -278,7 +280,9 @@ class _RangeSheetState extends ConsumerState<_RangeSheet> {
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             Text(
-              widget.existing == null ? 'Add bond numbers' : 'Edit bond numbers',
+              widget.existing == null
+                  ? 'Add bond numbers'
+                  : 'Edit bond numbers',
               style: t.textTheme.titleLarge,
             ),
             const SizedBox(height: 8),

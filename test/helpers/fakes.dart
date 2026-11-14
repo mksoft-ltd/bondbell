@@ -48,6 +48,9 @@ class FakeStoreGateway implements StoreGateway {
   final List<String> nonConsumableBuys = <String>[];
   final List<String> consumableBuys = <String>[];
   final List<PurchaseDetails> completed = <PurchaseDetails>[];
+
+  /// Consumables ended through [finishConsumable] (Play: consumed).
+  final List<PurchaseDetails> consumed = <PurchaseDetails>[];
   int restoreCalls = 0;
   int queryCalls = 0;
 
@@ -105,6 +108,11 @@ class FakeStoreGateway implements StoreGateway {
   Future<void> completePurchase(PurchaseDetails details) async {
     onComplete?.call(details);
     completed.add(details);
+  }
+
+  @override
+  Future<void> finishConsumable(PurchaseDetails details) async {
+    consumed.add(details);
   }
 
   static ProductDetails product(String id, String price) => ProductDetails(

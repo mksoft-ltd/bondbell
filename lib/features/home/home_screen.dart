@@ -157,8 +157,8 @@ class _LatestDrawCard extends ConsumerWidget {
           if (lastIsLatest && !stale) ...<Widget>[
             Text(
               last.hasWins
-                  ? 'You have ${last.wins.length} '
-                        '${last.wins.length == 1 ? 'prize' : 'prizes'} '
+                  ? 'You have ${last.prizeCount} '
+                        '${last.prizeCount == 1 ? 'prize' : 'prizes'} '
                         'worth ${gbp(last.totalWon)}.'
                   : 'No prizes for your bonds in this draw.',
               style: t.textTheme.headlineSmall,
@@ -189,7 +189,7 @@ class _LatestDrawCard extends ConsumerWidget {
                   ? 'Run a check against the bundled sample list to see how '
                         'Bondbell works. Nothing is downloaded.'
                   : 'Download NS&I\'s latest winning numbers and check all '
-                        'your bonds on this phone.',
+                        'your bonds on this ${deviceNoun(context)}.',
               style: t.textTheme.bodyLarge,
             ),
             const SizedBox(height: 16),
@@ -309,10 +309,10 @@ class _EarlierDraws extends ConsumerWidget {
               onPressed: () => ref
                   .read(indexProvider.notifier)
                   .refresh()
-                  .catchError((Object _) => const NsiIndex(
-                        draws: <RemoteList>[],
-                        unclaimed: null,
-                      )),
+                  .catchError(
+                    (Object _) =>
+                        const NsiIndex(draws: <RemoteList>[], unclaimed: null),
+                  ),
               child: const Text('Show available draws'),
             ),
           ] else if (earlier.isEmpty)

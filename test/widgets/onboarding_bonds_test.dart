@@ -1,6 +1,7 @@
 import 'package:bondbell/features/bonds/domain/holder.dart';
 import 'package:bondbell/features/bonds/presentation/holders_controller.dart';
 import 'package:bondbell/features/settings/presentation/app_settings.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -8,6 +9,24 @@ import '../helpers/app_harness.dart';
 
 void main() {
   group('onboarding', () {
+    for (final (TargetPlatform platform, Size size, String noun) in
+        <(TargetPlatform, Size, String)>[
+          (TargetPlatform.iOS, Surfaces.phone, 'phone'),
+          (TargetPlatform.iOS, Surfaces.ipad, 'iPad'),
+          (TargetPlatform.android, Surfaces.phone, 'phone'),
+          (TargetPlatform.android, Surfaces.ipad, 'tablet'),
+        ]) {
+      testWidgets('page 2 names the device: "$noun" on ${platform.name} at '
+          '${size.width.toInt()}pt', (WidgetTester tester) async {
+        debugDefaultTargetPlatformOverride = platform;
+        await pumpBondbell(tester, onboarded: false, size: size);
+        await tester.tap(find.text('Next'));
+        await tester.pumpAndSettle();
+        expect(find.text('Your numbers stay on this $noun'), findsOneWidget);
+        debugDefaultTargetPlatformOverride = null;
+      });
+    }
+
     testWidgets('first launch: three pages, independence notice, then My bonds',
         (WidgetTester tester) async {
       final Harness h = await pumpBondbell(tester, onboarded: false);
