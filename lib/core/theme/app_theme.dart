@@ -62,9 +62,23 @@ abstract final class AppTheme {
             fontSize: 18,
             fontWeight: FontWeight.w600,
           ),
-          bodyLarge: base.bodyLarge?.copyWith(fontSize: 18, height: 1.4),
-          bodyMedium: base.bodyMedium?.copyWith(fontSize: 16, height: 1.4),
-          bodySmall: base.bodySmall?.copyWith(fontSize: 14, height: 1.35),
+          // Material's body tracking (0.5 / 0.25 / 0.4) is tuned for 14–16pt;
+          // at these larger sizes it reads as gappy, so it is tightened.
+          bodyLarge: base.bodyLarge?.copyWith(
+            fontSize: 18,
+            height: 1.4,
+            letterSpacing: 0.15,
+          ),
+          bodyMedium: base.bodyMedium?.copyWith(
+            fontSize: 16,
+            height: 1.4,
+            letterSpacing: 0.1,
+          ),
+          bodySmall: base.bodySmall?.copyWith(
+            fontSize: 14,
+            height: 1.35,
+            letterSpacing: 0.2,
+          ),
           labelLarge: base.labelLarge?.copyWith(
             fontSize: 16,
             fontWeight: FontWeight.w600,
@@ -83,7 +97,10 @@ abstract final class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 1,
         centerTitle: false,
-        titleTextStyle: text.titleLarge,
+        // No titleTextStyle here: `text` has no font sizes yet (Material's
+        // geometry is merged in later by Theme), so a theme-level style came
+        // out at 14pt. The AppBar default (textTheme.titleLarge, 22pt w700)
+        // also keeps every AppBar's foregroundColor working.
         // Icon brightness only; bar colours are the deprecated Android 15
         // APIs Play warns about.
         systemOverlayStyle: dark

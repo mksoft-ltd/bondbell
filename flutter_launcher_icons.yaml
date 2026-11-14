@@ -1,0 +1,14 @@
+# Generated from store_assets/icon/build_icon.py (OpenArt mark, finished in code).
+# Regenerate: python3 store_assets/icon/build_icon.py && dart run flutter_launcher_icons
+# After running, revert the project-level
+# ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS change the tool makes
+# in ios/Runner.xcodeproj/project.pbxproj (known 0.14.x bug; see store_assets/BRAND.md).
+flutter_launcher_icons:
+  image_path: "store_assets/icon/app_icon_1024.png"
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  min_sdk_android: 21
+  adaptive_icon_background: "#1F5C45"
+  adaptive_icon_foreground: "store_assets/icon/adaptive_foreground.png"
+  adaptive_icon_monochrome: "store_assets/icon/adaptive_monochrome.png"
