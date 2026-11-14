@@ -376,4 +376,138 @@ true:
   documentation request (answer 1). Next comes a 2.1 query on the IAP screenshot if S-3 is
   missed. 4.1(c) on the name is a small residual.
 
-Verdict: FAIL — B-1 privacy-policy URL (404) and support/marketing URL (no DNS) must return 200 before submission
+*(First-pass verdict, superseded by the re-verification below: FAIL on B-1.)*
+
+---
+
+## Re-verification: 14 Nov 2026, HEAD c62ca56 (code at b4f1e5c)
+
+Every item below was re-checked directly against live URLs, the source code and the rebuilt
+artifacts, not taken from fix notes.
+
+**Artifacts checked**
+- `app-release.aab` was built at 18:08 and `Runner.app` (App.framework) at 18:09.
+- `find lib -newer` returns nothing for either, so both builds contain the final code.
+- The AAB is still signed by the upload key, SHA-1 `6F:08:…:C5`.
+- The merged-manifest permission set is unchanged: no AD_ID, no alarm or
+  foreground-service permissions.
+- `Info.plist` is unchanged: `ITSAppUsesNonExemptEncryption=false`, no
+  usage-description keys, `UIDeviceFamily` [1, 2].
+- Neither binary contains the string "SCREENSHOT".
+- The URL set in both binaries is identical to the first pass.
+
+**Process note.** I ran `scripts/build_privacy_html.py --help`. The script ignores the
+flag, so it regenerated `docs/privacy_policy.html` in the working tree. `git status` and
+`git diff HEAD` show the output is byte-identical to HEAD. That incidentally proves the
+Markdown source and the HTML are in sync. Nothing else in the repo was touched.
+
+### Status of first-pass findings
+
+| Item | Status | Evidence |
+|---|---|---|
+| **B-1** privacy and support URLs | **Resolved** | Privacy URL: `curl` returns 200 `text/html; charset=utf-8`, and the served file is byte-identical (`cmp`) to `docs/privacy_policy.html` at HEAD, which is generated from `PRIVACY_POLICY.md` with no diff (see the process note). Support URL: `https://bondbell.froggyeye.com/` returns 200 `text/html` and was read in full. It says "an independent app … not affiliated with, endorsed by or connected to NS&I", gives the Director of Savings attribution twice, uses no "official" or "approved" claim, has a working email contact, links the privacy policy, and its Free/Pro split matches the app exactly. |
+| **S-1** Pro gates NS&I-data features (5.2.2) | **Accepted risk (founder decision, 14 Nov)** | Pro is unchanged: earlier draws and the all-bonds unclaimed search stay paid. It does not lead to certain rejection: the design keeps to NS&I's personal-use wording and there is live precedent on both stores. If a reviewer raises 5.2.2, use reviewer answer 1 above, without the bracketed re-gating sentence. If Apple insists, re-gating those two features to free is a one-build fix. The NS&I email for written comfort is still recommended. |
+| **S-2** trade-mark owner | **Resolved** | `lib/core/constants/app_constants.dart:39-42` now reads "…Premium Bonds is a registered trademark of the Director of Savings." The same string is in `libapp.so` (arm64) and `App.framework/App`, and the old "trade marks of National Savings and Investments" string is gone from both. It matches the store descriptions and the support page word for word. |
+| **S-3** IAP review screenshots | **Resolved in the procedure; capture pending** | `docs/IAP_PRODUCTS.md` now requires captures from a normal build showing Pro not owned, with price and buy button, and the tip jar. Taking them is a publish-stage task; check them before attaching. |
+| **S-4** website before submit | **Resolved** | The site is live (B-1). |
+
+### New since the first pass
+
+**Sample mode opens every Pro feature on sample data: compliant on both stores, no
+problem found.**
+
+How it works (`ca1d081`):
+- `proFeaturesProvider` is true when the user owns Pro **or** sample mode is on. It drives
+  every feature gate: extra holders, earlier draws, the bulk unclaimed search, History, and
+  the defence-in-depth `_gate()` in `check_session.dart`.
+- `isProProvider`, the real entitlement, still drives the Pro screen and Settings, so the
+  real buy button and price stay visible in sample mode.
+- The Pro flag is never written.
+
+The decisive point is what sample mode can reach:
+- `drawSourceProvider` returns `SampleDrawSource` whenever sample mode is on, and that
+  source reads only bundled, synthetic ZIPs.
+- Holders and records are stored under `sample.*` keys through `dataScopeProvider`.
+- So nothing a user does in sample mode reaches NS&I's real lists or the user's real bonds.
+  Typing real bond numbers into a sample holder only checks them against made-up lists.
+- No paid functionality is delivered outside in-app purchase. What sample mode gives is a
+  labelled demo of the paid screens.
+
+Against the rules:
+- **Apple 3.1.1** ("own mechanisms to unlock content or functionality") is not triggered,
+  because no real content or functionality is unlocked.
+- **Apple 2.3.1** (hidden or undocumented features) is not triggered. The behaviour is
+  disclosed in the banner, in the Pro screen note ("open to try on the sample data. To use
+  them with your own bonds, unlock Pro"), in both store descriptions and in the review
+  notes.
+- **Apple 3.1.2** (time-limited trials) does not apply, because there is no time limit and
+  no real use.
+- **Google Play Payments** is not affected, because Play Billing remains the only way to
+  get real Pro.
+- **Google Play App access** is answered properly. "Yes (paid content), instructions only"
+  with the sample-mode walkthrough is the right filing for a no-login app with paid
+  features, and Play reviewers, who cannot buy, can reach every paid screen.
+
+Apple reviewers can also buy in sandbox, so for Apple the demo is a convenience rather than
+a dependency. Notes step 2 says the sample check finds "2 sample prizes worth £125"; that
+matches `test/check_session_test.dart` and `check_result_test.dart`.
+
+"Search 20,100 bonds" matches the sample holders: 20,000 + 50 + 50. The "October 2026
+(sample)" and "September 2026 (sample)" draws exist in `SampleDrawSource.index`, and the
+tip card is still hidden in sample mode (`result_view.dart:103`).
+
+**Other new code matched against the policy and metadata**
+- The privacy policy now describes the recovery copy (`vault.json.bak`, refreshed at each
+  clean open), the damaged-file set-aside (`vault.json.corrupt-<ms>`) and exactly what
+  "Delete all my data" removes. All of it matches `DataVault.open` and
+  `deleteAllPrivateData()`, which clears `real.*` and `sample.*` and deletes the leftover
+  files.
+- The policy also matches the dialog text in `deleteAllDialogText`: holders, bond numbers
+  and results are removed, including sample data; settings, reminders and Pro are kept.
+- On iOS everything sits in the backup-excluded folder, as both descriptions and the
+  policy say.
+
+**Metadata re-read in full at HEAD**
+- Files read: both descriptions, promo text, subtitle, keywords, review notes (3,809
+  characters), the Play short description and changelog, `PRIVACY_POLICY.md`,
+  `app_privacy_details.json` (`DATA_NOT_COLLECTED`) and `data_safety_answers.md` §11–12.
+- The only description change is the TRY IT FIRST paragraph, which is accurate.
+- Field lengths: iOS description 3,110 and Play description 3,165, both under 4,000. All
+  other fields are unchanged and within limits.
+- The banned-word and leaked-text grep finds nothing apart from known false positives: the
+  disclaimer's "endorsed by", the review notes' "NOT GAMBLING" heading, and £125 inside the
+  review notes, which are not public. Read end to end as prose, there are no
+  conversational artefacts.
+
+#### New Should-fix
+
+**S-5. One review-note sentence is now false.**
+- `ios/fastlane/metadata/review_information/notes.txt` line 6 says: "(Later, Settings >
+  'Sample mode' turns it on; **there is no sample button on the Check tab**.)"
+- Commit `b4f1e5c` added a "Try with sample numbers" button to Home, which *is* the Check
+  tab (`home_screen.dart:110`), and the Play instructions rely on it.
+- A false statement to the reviewer is not a rejection reason in itself, but it is exactly
+  the kind of mismatch that makes a reviewer distrust the rest of the notes.
+- **Fix (metadata only, no rebuild):** replace the bracket with "(Or later: 'Try with
+  sample numbers' on the Check tab, or Settings > 'Sample mode'.)". It costs about the
+  same number of characters, so the notes stay well under 4,000. Optionally, add the Check
+  tab button to `data_safety_answers.md` §11 step 1 as well.
+
+#### New Advisory
+
+**A-9.** The support page's App Store and Google Play badges link to `#`. That is fine
+before launch. Point them at the live listings once each store approves.
+
+A-6 is carried forward: check the newest History row's label when capturing store
+screenshot 6. The Should-fix and Advisory items do not block submission.
+
+### Updated first-submission approval estimate
+
+- **Google Play: about 92%.** Every App content declaration is filed, the URLs are live,
+  and reviewers can reach all paid content without buying.
+- **Apple: about 78%.** The single largest risk is the accepted S-1, a possible 5.2.2
+  request for authorisation. Answer it with reviewer answer 1, and re-gate those two
+  features if Apple insists. The other risks are small: a 4.1(c) name query, or a review
+  screenshot that does not show the locked Pro state.
+
+Verdict: PASS

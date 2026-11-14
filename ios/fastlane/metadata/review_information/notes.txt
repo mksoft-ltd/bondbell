@@ -3,7 +3,7 @@ Bondbell lets UK savers check their own Premium Bond numbers against the monthly
 
 NO LOGIN; HOW TO TRY EVERYTHING, INCLUDING PRO, WITHOUT BUYING
 There are no accounts. Sample mode opens every Pro feature on built-in, made-up sample data (two sample holders, three sample draws, two sample unclaimed prizes). From a fresh install:
-1. Onboarding: Next, Next, "Try with sample numbers". (Later, Settings > "Sample mode" turns it on; there is no sample button on the Check tab.)
+1. Onboarding: Next, Next, "Try with sample numbers". (Or later: "Try with sample numbers" on the Check tab, or Settings > "Sample mode".)
 2. Latest draw: Check tab > "Check the latest draw" > "Check the sample". Result: 2 sample prizes worth £125.
 3. Earlier draws (Pro): Check tab > "Earlier draws" card > "October 2026 (sample)" > "Check the sample".
 4. Unclaimed search for all bonds (Pro): Unclaimed tab > "Search 20,100 bonds" > "Check the sample".

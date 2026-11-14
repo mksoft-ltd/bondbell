@@ -580,4 +580,25 @@ Fix round 2 (5d100a1): Minor 2 · Nit 3. All verified fixed at ca1d081.
 
 Fix round 3 (ca1d081): new Critical 0 · Major 0 · Minor 0 · Nit 2 (N6, N7).
 
+## Release commit (14 Nov 2026, `b4f1e5c`; also holds for `c62ca56`)
+
+- **`b4f1e5c`** adds `_TrySampleCard` to Home. It is shown only when not in
+  sample mode. Its button calls `checkSessionProvider.reset()` and then
+  `setSampleMode(true)`. This is the same reset-then-switch order my
+  mode-switch analysis above relied on, so a check in progress is discarded
+  before the data scope changes.
+  - It touches no gate and no entitlement.
+  - The new widget test asserts `proFeaturesProvider` is true and
+    `isProProvider` is false afterwards, and that the card is hidden while in
+    sample mode.
+  - No new findings.
+- **`c62ca56`**, the current HEAD, is metadata, privacy-policy and
+  audit-document changes only. `git diff b4f1e5c c62ca56 -- lib ios/Runner
+  android/app pubspec.yaml` shows no code changes.
+- At HEAD: `flutter analyze` reports no issues, and `flutter test` passes
+  **352**.
+
+The verdict below applies to the code at `b4f1e5c`, which is identical in
+code to `c62ca56`.
+
 Verdict: PASS
