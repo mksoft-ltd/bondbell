@@ -76,7 +76,10 @@ Why "No" is right, so nobody "fixes" it later:
 
 | Question | Answer |
 |---|---|
-| Access | **All functionality is available without special access** (no login, no account) |
+| Access | **Filed 14 Nov 2026 as "Yes (paid content)"**: some functionality (Pro) is restricted. Access is by instructions only, with no credentials: sample mode opens every Pro feature on built-in sample data (see the walkthrough in §11). No username or password. |
+
+There is still no login or account; the "restricted" answer exists only because Pro
+features are paid, and Play asks how a reviewer can reach them.
 
 ## 5. Content rating (IARC questionnaire)
 
@@ -150,16 +153,40 @@ If the console instead lists features to tick, tick none. Do not pick "investmen
 - Countries: all available (ASO §7). The en-GB listing is the only locale; write
   release notes for en-GB only (house-facts §19).
 
-## 11. Optional reviewer note (if the console offers a notes field)
+## 11. Reviewer note / App access instructions
 
 ```
 Bondbell checks a user's own UK Premium Bond numbers against the prize lists NS&I
-publishes on nsandi.com. The download happens on the device at the user's tap; bond
-numbers never leave the device. No login, no account, no ads, no analytics. It offers
-no NS&I account access and no financial service; Premium Bonds are a government
-savings product, not gambling, and the app sells no entries. To see the full flow,
-tap "Try with sample numbers" on the last onboarding page, then "Check the latest
-draw" > "Check the sample". Bondbell Pro (one-time unlock) and three optional tips
-(unlock nothing) are in Settings. Independent; not affiliated with NS&I.
+publishes on nsandi.com, on the device, at the user's tap; bond numbers never leave
+the device. No login, no account, no ads, no analytics, no NS&I account access, no
+financial service. Premium Bonds are a government savings product, not gambling.
+Independent; not affiliated with NS&I.
+Sample mode opens every Pro feature on made-up data, so no purchase is needed:
+1. Onboarding: Next, Next, "Try with sample numbers" (or Settings > "Sample mode").
+2. Check tab > "Check the latest draw" > "Check the sample" (2 sample prizes, £125).
+3. Earlier draws (Pro): Check tab > "Earlier draws" > "October 2026 (sample)" >
+   "Check the sample".
+4. Unclaimed (Pro): Unclaimed tab > "Search 20,100 bonds" > "Check the sample".
+5. History tab (Pro). 6. My bonds > "Add holder" (Pro).
+The banner's "Exit" returns to real data, where Pro is locked until bought.
+Settings > "See what Pro adds" shows the real buy button and price; the Tip jar in
+Settings offers optional tips that unlock nothing.
 Contact: info@froggyeye.com
 ```
+
+## 12. Console status (14 Nov 2026)
+
+All ten App content declarations were completed in the Play Console on 14 Nov 2026:
+
+| Declaration | Filed as |
+|---|---|
+| Privacy policy | https://mksoft-ltd.github.io/bondbell/privacy_policy.html |
+| App access (Sign-in details) | Yes (paid content); instructions-only access via sample mode (§11) |
+| Ads | No |
+| Content rating (IARC) | Accepted |
+| Target audience | 18 and over |
+| Data safety | No data collected or shared |
+| Advertising ID | No |
+| Government apps | No |
+| Financial features | None |
+| Health apps | None |

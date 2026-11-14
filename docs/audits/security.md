@@ -53,8 +53,9 @@ Status is as of the re-verification on 14 Nov 2026, against `5d100a1`
 | L-4 | Low | `debugPrint` survives release; one path can write stored JSON (bond numbers) to the device log | **Verified fixed** |
 | L-5 | Low | Local data at rest is unencrypted (sandboxed SharedPreferences) | **Accepted** (data now in the vault file; still sandboxed, unencrypted) |
 | L-6 | Low | Dart code is not obfuscated in either release binary | **Accepted** |
-| N-1 | Low (new) | `vault.json.bak` / `vault.json.tmp` survive "Delete all my data" | Open |
-| N-2 | Low (new) | The downloads page read has no total deadline (two inter-chunk timeouts) | Open |
+| N-1 | Low (new) | `vault.json.bak` / `vault.json.tmp` survive "Delete all my data" | **Verified fixed** at ca1d081 (also covers `vault.json.corrupt-*`) |
+| N-2 | Low (new) | The downloads page read has no total deadline (two inter-chunk timeouts) | **Verified fixed** at ca1d081 (60 s page deadline) |
+| F-1 | Info (ca1d081) | Sample mode opens Pro features on sample data | Reviewed: no entitlement bypass |
 | N-3 | Info (new) | New native backup-exclusion channel and build-guard script: reviewed, no issue | n/a |
 | I-1 … I-10 | Informational | Verified controls and context (privacy claim, transport, manifest, signing, debug switches, ZIP parsing, Play pending, dependencies) | Re-checked on fresh artifacts |
 
@@ -199,6 +200,8 @@ Flutter 3.44 tooling behaviour.
 
 ### N-1 (new, Low): `vault.json.bak` and `vault.json.tmp` survive "Delete all my data"
 
+> **14 Nov 2026 (ca1d081): verified fixed.** See "Final re-check".
+
 **Affected:** `local_store.dart` (`DataVault.open`, `_flush`),
 `settings_screen.dart:146-176`.
 
@@ -223,6 +226,8 @@ the vault becomes empty of `real.`/`sample.` keys. Add a test that
 creates both files and asserts they are gone after Delete all.
 
 ### N-2 (new, Low): the downloads page read has no total deadline
+
+> **14 Nov 2026 (ca1d081): verified fixed.** See "Final re-check".
 
 **Affected:** `draw_source.dart` (`fetchIndex`):
 `r.stream.timeout(_timeout).timeout(_timeout * 2)`.
@@ -772,14 +777,155 @@ amounts, so nothing sensitive appears on the lock screen.
 
 ---
 
-## Remaining work (after the 14 Nov 2026 re-verification)
+## Final re-check, 14 Nov 2026 (HEAD `ca1d081`; commits `3623a80` and `ca1d081`)
 
-There are no gate blockers. Optional, in order of value:
+This round used the same method as before: a scratch probe package that
+calls the real code, ZIP inputs generated in the scratch area, and copies
+of the fresh artifacts. Nothing in the repo was written apart from this
+file and `PIPELINE.md`.
 
-1. **N-1:** delete `vault.json.bak` and `vault.json.tmp` in "Delete all my
-   data".
-2. **N-2:** put a total deadline on the downloads-page read.
-3. **Publish stage:** build the iOS archive with `flutter build ipa`. The
-   release guard now fails a stale Archive.
+### N-1: verified fixed
+
+`LocalStore.deleteAllPrivateData` clears `real.` and `sample.` from both
+SharedPreferences and the vault. It then calls `DataVault.deleteLeftovers`,
+which removes every `vault.json.*` side file once the vault holds no
+private keys.
+
+Probe sequence on a real `DataVault` with a real `LocalStore`:
+
+| Step | Folder contents |
+|---|---|
+| Write holders (real and sample), then relaunch | `vault.json`, `vault.json.bak` (the last good copy is refreshed at each clean launch) |
+| Corrupt `vault.json`, then relaunch | `status=recovered`; `vault.json`, `vault.json.bak`, `vault.json.corrupt-<millis>`; holders restored from `.bak` |
+| Plant a `vault.json.tmp` holding a bond number, then **Delete all my data** | `ok=true`; only `vault.json` remains, holding `{}`; prefs keep only `settings.onboarded` |
+| Any file in the folder still containing `999ZZ` | **none** |
+
+**Side files stay in the excluded folder.** Every side file is created as
+`${vault.json path}.<suffix>` in the same `bondbell_private` directory,
+which carries the iOS backup-exclusion attribute (verified on the
+simulator in the previous round). Android excludes all app data. So
+`.bak`, `.corrupt-*` and `.tmp` never reach a backup.
+
+The one open window: between a normal edit and the next launch, `.bak`
+still holds the previous state. That is inside the excluded folder, and
+Delete all removes it. Accepted.
+
+### N-2: verified fixed
+
+`fetchIndex` now has a 60 s whole-read deadline (`pageDeadline`) on top
+of the 30 s stall timeout and the 2 MB cap. Probe: a page trickling one
+byte every 200 ms, with the deadline set to 2 s through the test seam,
+fails with "took too long" after 2007 ms.
+
+The overall ZIP download deadline was raised from 10 to 30 minutes (review
+N4). The 200 MB cap and the 30 s stall timeout are unchanged, so this does
+not weaken M-1.
+
+### Rewritten line splitter: the 4 KB bound still holds
+
+`BoundedLineSplitter` is now a synchronous guard in front of
+`LineSplitter`. It throws when the run of characters with no line break
+exceeds 4096, either across chunk boundaries or inside a chunk's first or
+last segment.
+
+Lines entirely between two breaks in one chunk are not measured. They are
+bounded by the chunk size, which I measured at **65,536 bytes**, the
+maximum inflate output chunk. `LineSplitter` emits them at once without
+buffering, so memory stays bounded.
+
+| Input | Result |
+|---|---|
+| 600 MB of `A` with no newline (`longline.zip`) | `ScanLimitException` in 18 ms |
+| 2,000 lines of 50,000 chars each | `ScanLimitException` in 8 ms (the first line is caught) |
+| A 5,000-char line ending in CRLF | `ScanLimitException` |
+
+The declared-size and 512 MB inflate caps are unchanged from the previous
+round.
+
+### F-1 (ca1d081): sample mode opens Pro features. No entitlement bypass beyond M-2
+
+`proFeaturesProvider = isPro || sampleMode` now drives every feature gate:
+
+- `addHolder`
+- `addHolderFlow`
+- Home's earlier draws
+- the bulk unclaimed search
+- History
+- `CheckSessionController._gate`
+
+I checked whether this can be turned into Pro on the user's own data:
+
+- **The data scope and the draw source both derive from sample mode.**
+  `dataScopeProvider` (`sample.` vs `real.`) and `drawSourceProvider`
+  (`SampleDrawSource` vs `NsiDrawSource`) are both computed from
+  `sampleModeProvider`. In sample mode the app reads and writes only
+  `sample.*` holders and records, and checks only against the bundled
+  synthetic lists. `SampleDrawSource` never touches the network. A user
+  can type their real bond numbers into the sample holders, but they can
+  only be checked against made-up lists, so this gives none of what Pro
+  sells: checking real NS&I draws, history of real results, and more than
+  one real holder.
+- **No path copies data between scopes.** `grep` finds no code that copies
+  `sample.*` into `real.*`, and no import or export feature.
+- **Leaving sample mode restores the real gates.** Each mode change
+  (Settings toggle, banner Exit) first calls
+  `checkSessionProvider.notifier.reset()`. That bumps the generation and
+  clears the prepared list, so a check prepared and gated in sample mode
+  cannot be started afterwards in real mode.
+  - Home's "Try sample mode" only turns sample mode *on*, which is not the
+    risky direction. Onboarding sets it before any session exists.
+  - Even with no reset, a sample `RemoteList` carries an `asset:///` URL.
+    `NsiDrawSource._send` refuses any non-https, non-nsandi.com URL, so a
+    stale sample list cannot become a real download.
+- **The Pro flag is never written by sample mode.** `isProProvider`
+  (the stored entitlement) still drives the Pro screen and Settings, and
+  `purchases.proOwned` is written only by the purchase path.
+- **In real mode** (`sampleMode=false`), `proFeaturesProvider ==
+  isProProvider`. So deep links to `/check/draw/<earlier>`, `/history` or
+  the bulk unclaimed check stay gated, exactly as before.
+
+The only way to "unlock" sample mode on real data is to change the stored
+flags themselves, which is M-2 (already accepted).
+
+### Release artifacts (fresh: AAB 18:02, iOS `App` 18:03)
+
+Copies were inspected; the originals are untouched.
+
+- **Network endpoints** (Dart `strings`, both binaries): unchanged.
+  `nsandi.com` ×3 (downloads page, prize checker, contact), the privacy
+  policy and the support site.
+- **Screenshot and debug switches:** `seedScreenshotData`, `_runTour`,
+  `SCREENSHOT`, `HOST_CAPTURE` and `312KM104217` all count **0** in both
+  binaries. `ios/Flutter/Generated.xcconfig` is `FLUTTER_TARGET=lib/main.dart`
+  with no app defines.
+- **The new code is present in both binaries:** `Grandad (sample)`, the
+  sample-mode Pro note and `deleteLeftovers`. All four sample ZIPs are
+  bundled.
+- **AAB merged manifest:** `allowBackup="false"`,
+  `fullBackupContent="false"`, `dataExtractionRules` present. Permissions
+  and exported components are identical to the first audit. The upload
+  certificate SHA-1 is still `6F:08:DF:…:C5`.
+- **Native code and dependencies:** no change since `5d100a1` in
+  `android/app`, `ios/Runner`, `ios/scripts`, the Xcode project or
+  `pubspec.*`.
+- **Freshness caveat:** `lib/features/home/home_screen.dart` is being
+  edited after both builds (18:02 and 18:03). At the end of this audit it
+  carried an **uncommitted** change adding a "Try with sample numbers"
+  card to Home. That card resets the check session and then turns sample
+  mode on, the same safe pattern as the other toggles. It adds no new
+  gate and has no security effect. The release builds that come next must
+  be made from the final committed tree, not these artifacts.
+
+## Remaining work (after the final re-check, 14 Nov 2026, HEAD ca1d081)
+
+There are no gate blockers. No security finding is open, apart from the
+accepted M-2, L-3 residual, L-5 and L-6.
+
+For the publish stage:
+
+1. Make the release builds from HEAD `ca1d081`. The current artifacts may
+   predate the last `home_screen.dart` edit.
+2. Build the iOS archive with `flutter build ipa`. The release guard fails
+   a stale Xcode Archive.
 
 Verdict: PASS

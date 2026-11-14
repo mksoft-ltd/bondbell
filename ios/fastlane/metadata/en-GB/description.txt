@@ -16,7 +16,7 @@ RESULTS-DAY REMINDER
 Turn on an optional reminder at 9am UK time on the day new results are expected. It tells you the new list should be available; it does not tell you whether you have a prize.
 
 TRY IT FIRST
-"Try with sample numbers" runs a complete check with made-up numbers, so you can see how it works before adding your own. Sample data is clearly labelled and kept apart from your real bonds.
+"Try with sample numbers" runs complete checks with made-up numbers, so you can see how it works before adding your own. In sample mode every Pro feature is open to try on the sample data. Sample data is clearly labelled and kept apart from your real bonds.
 
 BONDBELL PRO
 One purchase, yours for good. No subscription. Pro adds:

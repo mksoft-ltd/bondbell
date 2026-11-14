@@ -463,4 +463,121 @@ verified fixed at 5d100a1 except n6, which is accepted.
 Fix round 2 (5d100a1): new Critical 0 · Major 0 · Minor 2 (N1, N2) · Nit 3
 (N3 to N5).
 
+## Final re-check, fix round 3 (14 Nov 2026, HEAD `ca1d081`)
+
+This covers commit `3623a80` (N1, N2 and the N3 to N5 nits, plus security
+and compliance items) and commit `ca1d081` (sample mode opens every Pro
+feature on sample data). I reviewed both diffs as new code. Probes ran in a
+throwaway copy of `ca1d081` in my scratchpad, which I deleted afterwards. I
+wrote nothing to the repo except this file and `PIPELINE.md`.
+
+### What I ran
+
+- `flutter analyze`: no issues. `flutter test`: **352 passed**.
+- **Engine, after the line-splitter rewrite.** `BoundedLineSplitter` is now
+  `LineSplitter` behind a synchronous `map` that only measures the run
+  since the last line break. I re-ran my separate Python scanner on the real
+  files:
+  - Nov 2026 winners **66/66 identical**, in **0.80 s**. That is back to
+    the original 0.74 s, from 1.51 s in round 2.
+  - Unclaimed **180/180 identical**, in 0.36 s.
+  - The 8 anonymous and duplicate-bond probes were identical.
+  - The June and October 2026 files still parse their own month, and
+    integrity is ok.
+  - The guard is correct: a line that ends inside a chunk is emitted by
+    `LineSplitter` at once, so only the unfinished tail of a chunk can grow,
+    and `run` measures exactly that tail.
+- **Vault probes** (7 probe tests, all pass):
+  - A failed write returns false, leaves memory unchanged, and a later write
+    repairs it.
+  - `HoldersController` throws `SaveFailedException` and leaves the holder
+    list unchanged. The save queue keeps working after a failure: a
+    following save still lands.
+  - A corrupt `vault.json` with a good `.bak` comes back as `recovered` with
+    the old data. Each corrupt file is set aside under its own
+    `.corrupt-<ms>` name, so a second corruption keeps the first.
+  - A corrupt file with no `.bak` comes back as `lost`, and the user sees a
+    dialog explaining it.
+  - `deleteAllPrivateData` leaves only an empty `vault.json` (`.bak`,
+    `.corrupt-*` and `.tmp` are removed) and keeps `purchases.proOwned` and
+    the settings.
+  - Migration with a failing write keeps the prefs copy, and a later launch
+    completes it.
+- **Sample-mode Pro gate (`ca1d081`).** Every gate reader is in this list:
+  - `proFeaturesProvider` (real Pro OR sample mode) controls features only:
+    the add-holder flow and `addHolder`, `CheckSessionController._gate`,
+    History, Earlier draws, and Unclaimed "search all".
+  - `isProProvider` still drives the entitlement display: the Pro screen
+    and Settings.
+  - Nothing writes `purchases.proOwned` from sample mode.
+
+### Can a paid feature reach REAL data without a purchase? No
+
+These are the paths I traced and probed.
+
+- **Data and source scoping.** In sample mode `drawSourceProvider` is
+  `SampleDrawSource`, which only reads bundled assets, and holders and
+  records use the `sample.` keys. So even a sample-mode Pro check of numbers
+  the user typed in only reads made-up lists.
+- **Switching modes mid-flow.** All three switches call
+  `checkSessionProvider.reset()` before flipping the mode: the shell
+  banner's Exit, the Settings switch, and Home's "Try with sample numbers".
+  `reset()` bumps the generation, so a sample check that finishes after the
+  exit is thrown away. Onboarding sets the mode before any check can exist.
+- **Worst case without the reset.** I built a probe that prepares a free
+  user's `unclaimedAll` and `2026-10` checks in sample mode, flips to real
+  mode **without** a reset, then calls `start()` against the real
+  `NsiDrawSource`. Both end **failed with nothing recorded**: the prepared
+  list's `asset:///` URL cannot pass the https `*.nsandi.com` check. That
+  is a second layer behind the reset.
+- **Holder limit.** In a probe, a free user with one real holder is refused
+  a second. In sample mode, adding is allowed and goes into the sample
+  holders. After exit, the real list is unchanged (`['Me']`), `isPro` is
+  false, and `proOwned` is never written.
+- **Routes.** Gated routes (`/check/unclaimed`, `/check/draw/:id`) re-run
+  `_gate` in `prepare` whatever screen pushed them. Nothing sets
+  `restorationScopeId`, and there are no deep links, so neither state
+  restoration nor a URL can open a check outside these gates.
+- **A paying user** is unaffected: `proFeaturesProvider` is `isPro || …`,
+  and the Pro screen and Settings still read `isProProvider`.
+
+### Status of the round-2 findings
+
+| Finding | Status (14 Nov 2026, `ca1d081`) |
+|---|---|
+| N1 silent vault failures / unexplained empty app | **Verified fixed**. Writes are committed to memory only after they succeed. A failed save is reported: the range sheet stays open with the message, other saves show a snackbar via `saveOrExplain`, and a check fails with "couldn't save the result". The previous launch's good copy is kept as `.bak`, with `recovered`/`lost` explained once at launch, and corrupt files are kept under unique names. Probed as above. |
+| N2 pending order hitting "already owned" | **Verified fixed**. During a restore or recovery, a pending purchase sets `_sawPending` and the window ends with `pendingEarlier` ("still waiting for approval… no need to buy again") instead of `tipCleared`/`failed`. A user-initiated Restore that finds only a pending order says the same instead of "nothing to restore". The fake `playPendingRestored` and its test exercise it. |
+| N3 scan twice as slow | **Verified fixed** (0.80 s, results identical). |
+| N4 10-minute total download deadline | **Verified fixed** (30 minutes; the 30 s stall timeout still catches a dead connection). |
+| N5 second page timeout not a total deadline | **Verified fixed** (a 60 s `Stopwatch` deadline on the whole page read). |
+
+### New findings, fix round 3 (none blocking)
+
+- **N6 (Nit). A holders save queued across a mode switch could land in the
+  wrong scope.**
+  - **Where**: `holders_controller.dart`, `_mutate`.
+  - The Notifier instance survives the rebuild that a sample-mode toggle
+    causes. A write already in flight then assigns `state = next` (the old
+    scope's holders) after `_key` and `state` have switched. The next real
+    save would persist that.
+  - It is unreachable through the UI: every save runs inside a modal sheet,
+    dialog or screen, and the write takes milliseconds.
+  - **Fix**: capture `_key` when the mutation starts, write to that key, and
+    skip the `state` assignment if `_key` has changed by the time it lands.
+- **N7 (Nit). `_gate` runs in `prepare()`, not again in `start()`.**
+  - Today this is safe: every mode switch resets the session, and the
+    prepared URL check stops a cross-mode start (both probed above).
+  - Re-running `_gate` and checking that `source.isSample` matches the
+    prepared list at the top of `start()` would make the Pro gate hold even
+    if a future change adds a mode switch without a reset.
+
+## Totals
+
+Original review (c9346e5): Critical 0 · Major 1 · Minor 8 · Nit 6. All are
+verified fixed except n6, which is accepted.
+
+Fix round 2 (5d100a1): Minor 2 · Nit 3. All verified fixed at ca1d081.
+
+Fix round 3 (ca1d081): new Critical 0 · Major 0 · Minor 0 · Nit 2 (N6, N7).
+
 Verdict: PASS

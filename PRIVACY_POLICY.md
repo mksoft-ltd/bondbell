@@ -32,6 +32,13 @@ Bondbell saves the following in its own private storage on your device:
 
 None of this is sent to us or to anyone else.
 
+Your holder names, bond numbers and results are kept together in one file in a
+private folder inside the app. Each time Bondbell opens that file successfully
+it keeps a recovery copy of it in the same folder, so your bonds can be
+restored if the file is ever damaged; if a damaged file is found, it is set
+aside in that folder rather than overwritten. These copies never leave the
+device and are covered by the same backup rules below.
+
 Backups work like this:
 
 - On iPhone and iPad, your holder names, bond numbers and results are kept in
@@ -50,9 +57,10 @@ would add your bond numbers again. A Pro purchase can always be restored from
 the store.
 
 You can delete every holder, bond number and saved result at any time in
-Settings, using "Delete all my data". Your settings and Pro purchase are kept,
-and Pro can be restored from the store in any case. Removing the app removes
-all of its data from the device.
+Settings, using "Delete all my data". This includes sample-mode data and the
+recovery and damaged copies described above. Your settings, your reminders and
+your Bondbell Pro purchase are kept. Removing the app removes all of its data
+from the device.
 
 ## The connection to NS&I
 
@@ -74,8 +82,8 @@ How NS&I handles that request is covered by NS&I's own privacy notice.
 The downloaded list is read on your device and deleted as soon as the check
 finishes, or when you cancel it.
 
-Bondbell is independent and is not affiliated with, endorsed by or connected
-to NS&I.
+Bondbell is an independent app and is not affiliated with, endorsed by or
+connected to NS&I (National Savings and Investments).
 
 ## Purchases
 

@@ -30,11 +30,25 @@ turning it on for Pro is irreversible; it can be a later decision.
 
 ## App Review notes and review screenshots
 
-Apple requires a review screenshot per product (any honest capture of the purchase
-UI). Use the Pro screen (`docs/build_evidence/ios_iphone_09_pro.png`) for Pro and a
-fresh capture of the Settings Tip jar card with its three buttons for the tips
-(`ios_iphone_08_settings.png` cuts the card off above the buttons, and the products did
-not exist yet, so capture it at the publish stage once they load from the store).
+Apple requires a review screenshot for each product. Capture both from a **normal
+build** (release or profile, **not** `SCREENSHOT_MODE`, which unlocks Pro and seeds data),
+after the products exist in App Store Connect so the store returns real prices:
+
+| File | What it must show | Used for |
+|---|---|---|
+| `store_assets/iap_review/pro.png` | The Pro screen (Settings > "See what Pro adds") in the **not-owned** state: the four benefits, the "Unlock Pro · <price>" button and "Restore purchases". Sample mode is fine: the Pro screen still shows the real not-owned state there, plus the sample-mode note. | `com.froggyeye.bondbell.pro` |
+| `store_assets/iap_review/tips.png` | The Settings "Tip jar" card scrolled fully into view, including the "Tips don't unlock anything" sentence and all three tip buttons with prices. | all three tips (the same image for each) |
+
+Do not reuse `docs/build_evidence/ios_iphone_09_pro.png` (captured in screenshot mode,
+so Pro shows as owned) or `ios_iphone_08_settings.png` (cuts the tip card off above
+the buttons, before the products existed).
+
+Apple's accepted size: the review screenshot must be at least **640 × 920 pixels**
+(JPEG or PNG, RGB). The safest choice is a full-screen capture at an App Store
+screenshot size, e.g. **1320 × 2868** (iPhone 6.9") or **1290 × 2796** (iPhone 6.7"),
+portrait. Apple only uses it for review; it is never shown to customers. (Minimum size
+from Apple's IAP help; verify in the console if the upload is refused.) Play needs no
+IAP screenshot.
 
 **Bondbell Pro, review note:**
 
@@ -42,9 +56,10 @@ not exist yet, so capture it at the publish stage once they load from the store)
 Non-consumable unlock, no subscription. Unlocks: unlimited holders (free: one),
 checking any earlier month NS&I lists (free: latest draw), unclaimed-prize search
 across all saved bonds at once (free: one number at a time), and the History tab.
-Reach it from Settings > "See what Pro adds", the History tab, or by adding a second
-holder on My bonds. "Restore purchases" is on the Pro screen and in Settings. To test
-without real bonds, tap "Try with sample numbers" in onboarding.
+Reach it from Settings > "See what Pro adds". To try every Pro feature without
+buying, use sample mode ("Try with sample numbers" in onboarding, or Settings >
+"Sample mode"); the full walkthrough is in the App Review notes. "Restore purchases" is
+on the Pro screen and in Settings.
 ```
 
 **Tips (same note for small, medium and large):**
