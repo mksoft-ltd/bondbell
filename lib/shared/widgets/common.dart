@@ -40,7 +40,8 @@ class ContentWidth extends StatelessWidget {
     alignment: Alignment.topCenter,
     child: ConstrainedBox(
       constraints: BoxConstraints(maxWidth: maxWidth),
-      child: child,
+      // Full width of the column, so cards line up whatever their content.
+      child: SizedBox(width: double.infinity, child: child),
     ),
   );
 }

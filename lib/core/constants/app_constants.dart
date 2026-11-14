@@ -15,7 +15,7 @@ abstract final class AppConstants {
   static const String nsiPrizeCheckerPage =
       'https://www.nsandi.com/prize-checker';
   static const String nsiContactPage =
-      'https://www.nsandi.com/get-to-know-us/contact-us';
+      'https://www.nsandi.com/contact-us';
   static const String nsiOrigin = 'https://www.nsandi.com';
 
   /// Honest identification for requests to nsandi.com.

@@ -254,7 +254,7 @@ class SampleDrawSource implements DrawSource {
     draws: <RemoteList>[
       RemoteList(
         id: sampleDrawId,
-        label: 'Sample draw',
+        label: 'Sample',
         url: Uri.parse('asset:///$winnersAsset'),
       ),
     ],

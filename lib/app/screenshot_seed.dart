@@ -36,7 +36,7 @@ Future<void> seedScreenshotData(LocalStore store) async {
         bondsChecked: held,
       );
   final List<CheckRecord> records = <CheckRecord>[
-    rec('2026-11', 'Sample draw', <(String, int)>[
+    rec('2026-11', 'Sample', <(String, int)>[
       ('312KM104217', 100),
       ('312KM104388', 25),
     ]),

@@ -8,17 +8,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app/app.dart';
+import 'app/debug_flags.dart';
+import 'app/router.dart';
 import 'app/screenshot_seed.dart';
 import 'core/storage/local_store.dart';
 import 'features/draws/data/draw_source.dart';
 import 'features/purchases/data/store_gateway.dart';
 import 'features/purchases/presentation/purchase_controller.dart';
 import 'features/reminders/reminder_service.dart';
-
-/// `--dart-define=SCREENSHOT_MODE=true` seeds sample data and unlocks Pro
-/// for store screenshots. Ignored in release builds.
-const bool _screenshotDefine = bool.fromEnvironment('SCREENSHOT_MODE');
-const bool screenshotMode = _screenshotDefine && !kReleaseMode;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -50,15 +47,24 @@ Future<void> main() async {
     );
   }
 
-  runApp(
-    ProviderScope(
-      overrides: [
-        localStoreProvider.overrideWithValue(store),
-        storeGatewayProvider.overrideWithValue(NativeStoreGateway()),
-        reminderServiceProvider.overrideWithValue(reminders),
-        if (screenshotMode) forceProProvider.overrideWithValue(true),
-      ],
-      child: const BondbellApp(),
-    ),
+  final ProviderContainer container = ProviderContainer(
+    overrides: [
+      localStoreProvider.overrideWithValue(store),
+      storeGatewayProvider.overrideWithValue(NativeStoreGateway()),
+      reminderServiceProvider.overrideWithValue(reminders),
+      if (screenshotMode) forceProProvider.overrideWithValue(true),
+    ],
   );
+  runApp(
+    UncontrolledProviderScope(container: container, child: const BondbellApp()),
+  );
+  if (screenshotTour) unawaited(_runTour(container));
+}
+
+Future<void> _runTour(ProviderContainer container) async {
+  await Future<void>.delayed(const Duration(seconds: 4));
+  for (final (String route, int secs) in tourStops) {
+    container.read(routerProvider).go(route);
+    await Future<void>.delayed(Duration(seconds: secs));
+  }
 }

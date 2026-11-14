@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/debug_flags.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../shared/widgets/common.dart';
 import '../../settings/presentation/app_settings.dart';
@@ -52,6 +53,11 @@ class _CheckScreenState extends ConsumerState<CheckScreen> {
   @override
   Widget build(BuildContext context) {
     final CheckSessionState s = ref.watch(checkSessionProvider);
+    if (screenshotTour && s.phase == CheckPhase.ready) {
+      Future<void>.delayed(const Duration(seconds: 2), () {
+        if (mounted) ref.read(checkSessionProvider.notifier).start();
+      });
+    }
     final bool sample = ref.watch(sampleModeProvider);
     final String title = switch (widget.request.kind) {
       CheckKind.draw => 'Check a draw',

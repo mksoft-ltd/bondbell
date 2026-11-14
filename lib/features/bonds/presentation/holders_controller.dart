@@ -17,8 +17,8 @@ List<Holder> sampleHolders() => <Holder>[
     ranges: <BondRange>[
       BondRange(
         id: 'sample-r1',
-        start: BondNumber.parse('312KM104000'),
-        end: BondNumber.parse('312KM104499'),
+        start: BondNumber.parse('312KM100000'),
+        end: BondNumber.parse('312KM119999'),
       ),
       BondRange(
         id: 'sample-r2',

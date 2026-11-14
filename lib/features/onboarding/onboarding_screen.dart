@@ -22,7 +22,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         (
           icon: Icons.notifications_active_outlined,
           title: 'Check your bonds without logging in',
-          body: 'Save your Premium Bond numbers once, from a statement or old '
+          body:
+              'Save your Premium Bond numbers once, from a statement or old '
               'paper certificates. Each month Bondbell checks them against '
               'the winning numbers for you. It works for a relative\'s bonds '
               'too.',
@@ -30,7 +31,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         (
           icon: Icons.lock_outline,
           title: 'Your numbers stay on this phone',
-          body: 'When you check, Bondbell downloads NS&I\'s public list '
+          body:
+              'When you check, Bondbell downloads NS&I\'s public list '
               'straight from nsandi.com and compares it here. No account, no '
               'server of ours, no tracking.',
         ),
@@ -68,7 +70,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   _Page(
                     icon: Icons.check_circle_outline,
                     title: 'Ready when you are',
-                    body: 'Add your bond numbers, or try Bondbell first with '
+                    body:
+                        'Add your bond numbers, or try Bondbell first with '
                         'made-up sample numbers to see how a check works.',
                     footer: const InfoNote(AppConstants.independenceNotice),
                   ),
@@ -149,39 +152,49 @@ class _Page extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ThemeData t = Theme.of(context);
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
-      child: ContentWidth(
-        maxWidth: 560,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: t.colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Icon(
-                icon,
-                size: 48,
-                color: t.colorScheme.onPrimaryContainer,
+    // Vertically centred so a tall iPad screen reads as a composed page,
+    // still scrollable at large text sizes.
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints box) =>
+          SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: box.maxHeight - 72),
+              child: Center(
+                child: ContentWidth(
+                  maxWidth: 560,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Container(
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: t.colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: Icon(
+                          icon,
+                          size: 48,
+                          color: t.colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                      const SizedBox(height: 28),
+                      Semantics(
+                        header: true,
+                        child: Text(title, style: t.textTheme.headlineMedium),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(body, style: t.textTheme.bodyLarge),
+                      if (footer != null) ...<Widget>[
+                        const SizedBox(height: 28),
+                        footer!,
+                      ],
+                    ],
+                  ),
+                ),
               ),
             ),
-            const SizedBox(height: 28),
-            Semantics(
-              header: true,
-              child: Text(title, style: t.textTheme.headlineMedium),
-            ),
-            const SizedBox(height: 16),
-            Text(body, style: t.textTheme.bodyLarge),
-            if (footer != null) ...<Widget>[
-              const SizedBox(height: 28),
-              footer!,
-            ],
-          ],
-        ),
-      ),
+          ),
     );
   }
 }

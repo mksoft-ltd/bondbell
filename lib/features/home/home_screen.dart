@@ -15,6 +15,7 @@ import '../draws/presentation/check_session.dart';
 import '../draws/presentation/records_controller.dart';
 import '../purchases/presentation/purchase_controller.dart';
 import '../reminders/reminders_controller.dart';
+import '../settings/presentation/app_settings.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -145,6 +146,7 @@ class _LatestDrawCard extends ConsumerWidget {
     final bool lastIsLatest =
         last != null && (latestId == null || last.listId == latestId);
     final bool stale = last != null && last.fingerprint != fp;
+    final bool sample = ref.watch(sampleModeProvider);
 
     return SectionCard(
       title: lastIsLatest ? '${last.label} draw' : 'Latest draw',
@@ -183,6 +185,9 @@ class _LatestDrawCard extends ConsumerWidget {
               stale && lastIsLatest
                   ? 'Your bonds have changed since you last checked. Check '
                         'again to include them.'
+                  : sample
+                  ? 'Run a check against the bundled sample list to see how '
+                        'Bondbell works. Nothing is downloaded.'
                   : 'Download NS&I\'s latest winning numbers and check all '
                         'your bonds on this phone.',
               style: t.textTheme.bodyLarge,
@@ -311,8 +316,13 @@ class _EarlierDraws extends ConsumerWidget {
               child: const Text('Show available draws'),
             ),
           ] else if (earlier.isEmpty)
-            Text('No earlier draws are listed right now.',
-                style: t.textTheme.bodyLarge)
+            Text(
+              data.draws.length == 1 && ref.watch(sampleModeProvider)
+                  ? 'The sample has a single draw. With your own bonds, '
+                        'NS&I lists about six months to choose from.'
+                  : 'No earlier draws are listed right now.',
+              style: t.textTheme.bodyLarge,
+            )
           else
             for (final RemoteList l in earlier)
               _DrawRow(list: l, record: records[l.id], fingerprint: fp),

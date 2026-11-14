@@ -85,7 +85,7 @@ void main() {
     expect(st.phase, CheckPhase.done, reason: st.error);
     expect(st.record!.totalWon, 125);
     expect(st.record!.integrityOk, isTrue);
-    expect(st.record!.bondsChecked, 550);
+    expect(st.record!.bondsChecked, 550); // the fixture holder, not the sample one
     expect(c.read(recordsProvider)['2026-11']!.wins, hasLength(2));
     expect(source.handedOut.single.existsSync(), isFalse,
         reason: 'the downloaded list must be deleted after the check');
