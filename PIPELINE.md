@@ -34,3 +34,24 @@ regenerate: verify against a built AAB first (house-facts §26, §30).
 | compliance | pending | | Independence notice is in onboarding, Home, Settings and About. Purchases could not be exercised (products not yet created). |
 | publish | pending | | |
 | website | pending | | bondbell.froggyeye.com does not exist yet; privacy policy repo (mksoft-ltd/bondbell, PRIVACY_POLICY.md → privacy_policy.html) not created yet. Both URLs are already in `lib/core/constants/app_constants.dart`. |
+
+## Release build commands (security audit L-3)
+
+- **iOS: always build through Flutter**, never a bare Xcode Archive:
+  `flutter build ipa --release` (or `flutter build ios --release` immediately
+  before archiving). Flutter rewrites `ios/Flutter/Generated.xcconfig` on
+  every build; a screenshot capture leaves it pointing at
+  `integration_test/screenshots_test.dart` with `SCREENSHOT_MODE`/
+  `HOST_CAPTURE` defines, and Xcode alone does not regenerate it.
+  `ios/scripts/release_guard.sh` (Runner's Run Script phase) now fails any
+  Release build with a non-`lib/main.dart` target or a screenshot/capture
+  define, so a stale file stops the archive instead of shipping.
+- Android: `flutter build appbundle --release` (signs with the upload key above).
+- Never pass `--dart-define=SCREENSHOT_MODE` / `SCREENSHOT_TOUR` to a release
+  build; both are compiled out (`&& !kReleaseMode`) but the guard rejects them
+  on iOS anyway.
+- `integration_test.framework` is still embedded in the iOS Release app:
+  Flutter 3.44 does not filter dev-dependency plugins out of the iOS plugin
+  registrant (flutter/flutter#163874), and restricting the pod to Debug makes
+  the generated registrant fail to compile. It is dead code in Release (no
+  Dart caller, no XCTest linkage). Revisit when Flutter fixes the issue.

@@ -30,6 +30,36 @@ List<Holder> sampleHolders() => <Holder>[
   ),
 ];
 
+/// Parses stored holders one holder and one range at a time, skipping only
+/// what is unreadable. `lossy` is true when anything was skipped (or the
+/// value wasn't a list at all).
+({List<Holder> holders, bool lossy}) parseHoldersTolerant(Object? raw) {
+  if (raw is! List) return (holders: const <Holder>[], lossy: true);
+  bool lossy = false;
+  final List<Holder> out = <Holder>[];
+  for (final Object? h in raw) {
+    try {
+      final Map<String, Object?> m = h! as Map<String, Object?>;
+      final List<BondRange> ranges = <BondRange>[];
+      for (final Object? r in (m['ranges'] as List<Object?>?) ?? const <Object?>[]) {
+        try {
+          ranges.add(BondRange.fromJson(r! as Map<String, Object?>));
+        } on Object {
+          lossy = true;
+        }
+      }
+      out.add(Holder(
+        id: m['id']! as String,
+        name: m['name']! as String,
+        ranges: ranges,
+      ));
+    } on Object {
+      lossy = true;
+    }
+  }
+  return (holders: out, lossy: lossy);
+}
+
 String newId() {
   final Random r = Random();
   return '${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}'
@@ -45,17 +75,18 @@ class HoldersController extends Notifier<List<Holder>> {
   List<Holder> build() {
     final bool sample = ref.watch(sampleModeProvider);
     _key = '${ref.watch(dataScopeProvider)}holders';
-    final Object? raw = _store.readJson(_key);
-    if (raw is List) {
-      try {
-        return raw
-            .map((Object? e) => Holder.fromJson(e! as Map<String, Object?>))
-            .toList();
-      } on Object {
-        // Fall through to the default rather than crash on bad data.
-      }
+    final String? text = _store.getString(_key);
+    if (text == null) return sample ? sampleHolders() : const <Holder>[];
+    final ({List<Holder> holders, bool lossy}) parsed = parseHoldersTolerant(
+      _store.readJson(_key),
+    );
+    if (parsed.lossy) {
+      // Something didn't parse. Keep the original text so the next save
+      // (which rewrites the key from what did parse) can never be the end
+      // of the user's bonds (code review m5).
+      _store.setString('$_key.bak', text);
     }
-    return sample ? sampleHolders() : const <Holder>[];
+    return parsed.holders;
   }
 
   Future<void> _save(List<Holder> next) async {

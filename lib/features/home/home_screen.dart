@@ -23,7 +23,7 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final List<Holder> holders = ref.watch(holdersProvider);
-    final int bonds = holders.fold(0, (int a, Holder h) => a + h.bondCount);
+    final int bonds = uniqueBondCount(holders);
     final ThemeData t = Theme.of(context);
     final DateTime next = ResultsCalendar.nextResultsDay(DateTime.now());
 
@@ -42,8 +42,8 @@ class HomeScreen extends ConsumerWidget {
                 children: <Widget>[
                   Text(
                     'Copy the bond numbers from an NS&I statement or old paper '
-                    'certificates once. Bondbell then checks them against '
-                    'each month\'s winners for you.',
+                    'certificates once. Then each month, check them against '
+                    'the winners in a tap.',
                     style: t.textTheme.bodyLarge,
                   ),
                   const SizedBox(height: 16),

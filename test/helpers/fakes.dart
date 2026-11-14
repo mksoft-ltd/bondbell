@@ -125,6 +125,30 @@ class FakeStoreGateway implements StoreGateway {
   );
 }
 
+/// Play's "item already owned" exactly as in_app_purchase_android 0.5.5
+/// delivers it: the billing result carries no purchase, so the plugin emits
+/// an error with an EMPTY product id and BillingResponse.toString() as the
+/// message (`_getPurchaseDetailsFromResult`). Never the product's own id.
+PurchaseDetails playAlreadyOwned() {
+  final PurchaseDetails p = PurchaseDetails(
+    purchaseID: '',
+    productID: '',
+    verificationData: PurchaseVerificationData(
+      localVerificationData: '',
+      serverVerificationData: '',
+      source: 'google_play',
+    ),
+    transactionDate: null,
+    status: PurchaseStatus.error,
+  );
+  p.error = IAPError(
+    source: 'google_play',
+    code: 'purchase_error',
+    message: 'BillingResponse.itemAlreadyOwned',
+  );
+  return p;
+}
+
 /// One purchase update as the plugin would deliver it.
 PurchaseDetails purchaseUpdate(
   String productId,

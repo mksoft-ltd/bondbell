@@ -10,6 +10,7 @@ import '../bonds/domain/holder.dart';
 import '../bonds/presentation/holder_screen.dart';
 import '../bonds/presentation/holders_controller.dart';
 import '../draws/domain/check_models.dart';
+import '../draws/presentation/check_session.dart';
 import '../draws/presentation/records_controller.dart';
 import '../purchases/presentation/purchase_controller.dart';
 
@@ -46,7 +47,7 @@ class _UnclaimedScreenState extends ConsumerState<UnclaimedScreen> {
     final bool pro = ref.watch(isProProvider);
     final Map<String, CheckRecord> records = ref.watch(recordsProvider);
     final List<Holder> holders = ref.watch(holdersProvider);
-    final int bonds = holders.fold(0, (int a, Holder h) => a + h.bondCount);
+    final int bonds = uniqueBondCount(holders);
     final CheckRecord? all = records['unclaimed'];
     final CheckRecord? one = records['unclaimed-single'];
 
@@ -143,12 +144,17 @@ class _UnclaimedScreenState extends ConsumerState<UnclaimedScreen> {
   }
 }
 
-class _LastResult extends StatelessWidget {
+class _LastResult extends ConsumerWidget {
   const _LastResult({required this.record});
   final CheckRecord record;
 
+  static const String supersededNote =
+      'NS&I has published a newer unclaimed list since this search. Search '
+      'again for an up-to-date answer.';
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bool superseded = record.supersededBy(ref.watch(indexProvider).value);
     final String what = record.singleNumber != null
         ? 'Last search: ${record.singleNumber}'
         : 'Last search';
@@ -157,12 +163,12 @@ class _LastResult extends StatelessWidget {
               '${record.prizeCount == 1 ? 'prize' : 'prizes'} '
               '(${gbp(record.totalWon)})'
         : 'nothing found';
+    final String when =
+        DateFormat('d MMM y, HH:mm').format(record.checkedAt.toLocal());
     return ListTile(
       contentPadding: EdgeInsets.zero,
       title: Text('$what: $outcome'),
-      subtitle: Text(
-        DateFormat('d MMM y, HH:mm').format(record.checkedAt.toLocal()),
-      ),
+      subtitle: Text(superseded ? '$when. $supersededNote' : when),
       trailing: const Icon(Icons.chevron_right),
       onTap: () => context.push('/result/${record.listId}'),
     );

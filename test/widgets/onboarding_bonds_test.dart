@@ -31,6 +31,11 @@ void main() {
         (WidgetTester tester) async {
       final Harness h = await pumpBondbell(tester, onboarded: false);
       expect(find.text('Check your bonds without logging in'), findsOneWidget);
+      // Checks run on the user's tap; the copy must not promise automatic
+      // checking (metadata stage).
+      expect(find.textContaining('check them against the winning numbers in a tap'),
+          findsOneWidget);
+      expect(find.textContaining('checks them against'), findsNothing);
       expect(h.reminders.permissionRequests, 0,
           reason: 'notification permission is never asked at launch');
       await tester.tap(find.text('Next'));
@@ -133,6 +138,28 @@ void main() {
         expect(find.textContaining(e.value), findsOneWidget, reason: e.key);
       }
       expect(h.container.read(holdersProvider).single.ranges, isEmpty);
+    });
+
+    // Regression (code review m7): no in-flight guard, so a double tap on
+    // Save (or Save plus the keyboard's Done) added the range twice.
+    testWidgets('a double tap on Save, or Save plus Done, adds the range once',
+        (WidgetTester tester) async {
+      final Harness h = await openHolder(tester);
+      await openSheet(tester);
+      await tester.enterText(field('First (or only) bond number'), '312KM104000');
+      await tester.enterText(field('Last bond number (optional)'), '312KM104499');
+      // Fire Save twice and Done once before any frame or storage write
+      // completes: a real tap pair lands that fast on a device, where the
+      // write is slow. (tester.tap awaits microtasks between taps, which
+      // lets the first save finish and pop the sheet, hiding the race.)
+      final VoidCallback press = tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Save'))
+          .onPressed!;
+      press();
+      press();
+      tester.widget<TextField>(field('Last bond number (optional)')).onSubmitted!('');
+      await tester.pumpAndSettle();
+      expect(h.container.read(holdersProvider).single.ranges, hasLength(1));
     });
 
     testWidgets('a reversed or cross-series range is refused',

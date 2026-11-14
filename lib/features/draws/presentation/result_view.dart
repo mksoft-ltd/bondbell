@@ -9,6 +9,7 @@ import '../../bonds/presentation/holders_controller.dart';
 import '../../purchases/presentation/tip_jar.dart';
 import '../../settings/presentation/app_settings.dart';
 import '../domain/check_models.dart';
+import 'check_session.dart';
 
 /// The outcome of one check: wins grouped by holder, or a clear no-win
 /// state, always with "confirm with NS&I" and how to claim.
@@ -29,7 +30,8 @@ class ResultView extends ConsumerWidget {
 
     final Map<String, List<Win>> byHolder = <String, List<Win>>{};
     for (final Win w in record.wins) {
-      (byHolder[w.holderName] ??= <Win>[]).add(w);
+      // By id, not name: two holders can share a name (code review n2).
+      (byHolder[w.holderId] ??= <Win>[]).add(w);
     }
 
     return PageList(
@@ -41,6 +43,17 @@ class ResultView extends ConsumerWidget {
             child: InfoNote(
               'Your bonds have changed since this check, so newly added '
               'numbers aren\'t included. Check again to cover them.',
+              icon: Icons.update,
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+        if (record.supersededBy(ref.watch(indexProvider).value)) ...<Widget>[
+          const SectionCard(
+            child: InfoNote(
+              'NS&I has published a newer unclaimed list since this search, '
+              'so this result may be out of date. Search again for an '
+              'up-to-date answer.',
               icon: Icons.update,
             ),
           ),
@@ -63,7 +76,7 @@ class ResultView extends ConsumerWidget {
         for (final MapEntry<String, List<Win>> e
             in byHolder.entries) ...<Widget>[
           SectionCard(
-            title: e.key,
+            title: e.value.first.holderName,
             icon: Icons.person_outline,
             child: Column(
               children: <Widget>[

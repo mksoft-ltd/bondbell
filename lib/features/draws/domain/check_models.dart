@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../bonds/domain/holder.dart';
+import '../data/nsi_index.dart';
 
 /// One of the user's bonds found in a list.
 @immutable
@@ -63,6 +64,7 @@ class CheckRecord {
     required this.integrityOk,
     required this.bondsChecked,
     this.singleNumber,
+    this.sourceUrl,
   });
 
   /// `2026-11`, or `unclaimed`.
@@ -84,6 +86,20 @@ class CheckRecord {
 
   /// Unclaimed single-number search: the number that was looked up.
   final String? singleNumber;
+
+  /// The NS&I file this result came from. NS&I republishes the unclaimed
+  /// list under a new name ("…-june-1957-to-march-2025.zip"), so a later
+  /// index with a different URL means this result is out of date (code
+  /// review m8). Null for records saved before this field existed.
+  final String? sourceUrl;
+
+  /// True when [index] lists a different unclaimed file from the one this
+  /// unclaimed result was checked against.
+  bool supersededBy(NsiIndex? index) {
+    if (!listId.startsWith('unclaimed')) return false;
+    final String? now = index?.unclaimed?.url.toString();
+    return sourceUrl != null && now != null && now != sourceUrl;
+  }
 
   /// One entry per prize: a bond number wins once, however many holders
   /// it was saved under.
@@ -119,6 +135,7 @@ class CheckRecord {
     'integrityOk': integrityOk,
     'bondsChecked': bondsChecked,
     if (singleNumber != null) 'singleNumber': singleNumber,
+    if (sourceUrl != null) 'sourceUrl': sourceUrl,
   };
 
   factory CheckRecord.fromJson(Map<String, Object?> j) => CheckRecord(
@@ -133,6 +150,7 @@ class CheckRecord {
     integrityOk: j['integrityOk']! as bool,
     bondsChecked: (j['bondsChecked'] as int?) ?? 0,
     singleNumber: j['singleNumber'] as String?,
+    sourceUrl: j['sourceUrl'] as String?,
   );
 }
 

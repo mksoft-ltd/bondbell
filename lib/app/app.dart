@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/app_constants.dart';
 import '../core/theme/app_theme.dart';
 import '../features/purchases/presentation/purchase_controller.dart';
+import 'app_hooks.dart';
 import 'router.dart';
 
 final GlobalKey<ScaffoldMessengerState> messengerKey =
@@ -19,6 +20,9 @@ class BondbellApp extends ConsumerWidget {
       'No previous Bondbell Pro purchase was found for this account.',
     PurchaseNotice.tipThanks =>
       'Thank you so much for the tip. It really helps.',
+    PurchaseNotice.tipCleared =>
+      'An earlier tip hadn\'t finished and has now been cleared. Please try '
+          'again.',
     PurchaseNotice.cancelled => null,
     PurchaseNotice.failed => 'The purchase didn\'t go through. Please try '
         'again.',
@@ -50,6 +54,8 @@ class BondbellApp extends ConsumerWidget {
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
       routerConfig: ref.watch(routerProvider),
+      builder: (BuildContext context, Widget? child) =>
+          AppHooks(child: child ?? const SizedBox.shrink()),
     );
   }
 }

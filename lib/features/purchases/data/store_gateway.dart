@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:in_app_purchase_android/billing_client_wrappers.dart'
     show BillingResponse, BillingResultWrapper;
@@ -33,6 +34,14 @@ abstract class StoreGateway {
   Future<void> finishConsumable(PurchaseDetails details);
 }
 
+/// Play: false, so every tip is consumed by [StoreGateway.finishConsumable]
+/// whatever its history. StoreKit: must be true, because
+/// in_app_purchase_storekit asserts it (a debug build would otherwise throw
+/// before the sheet opens; code review m2). On iOS the transaction is
+/// finished by [StoreGateway.finishConsumable] either way.
+bool autoConsumeFor(TargetPlatform platform) =>
+    platform != TargetPlatform.android;
+
 class NativeStoreGateway implements StoreGateway {
   NativeStoreGateway() : _iap = InAppPurchase.instance;
   final InAppPurchase _iap;
@@ -50,7 +59,7 @@ class NativeStoreGateway implements StoreGateway {
   @override
   Future<bool> buyConsumable(ProductDetails product) => _iap.buyConsumable(
     purchaseParam: PurchaseParam(productDetails: product),
-    autoConsume: false,
+    autoConsume: autoConsumeFor(defaultTargetPlatform),
   );
   @override
   Future<void> restorePurchases() => _iap.restorePurchases();

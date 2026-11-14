@@ -1,13 +1,15 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data' show BytesBuilder;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 import '../../../core/constants/app_constants.dart';
 import 'nsi_index.dart';
+import '../../../core/utils/app_log.dart';
 
 /// Where the lists come from. The live source reads nsandi.com on the
 /// user's device; the sample source reads bundled synthetic files. Both
@@ -76,13 +78,18 @@ Future<void> clearScratch() async {
       e.deleteSync(recursive: true);
     }
   } on Object catch (e) {
-    debugPrint('clearScratch: $e');
+    appLog('clearScratch: $e');
   }
 }
 
 class NsiDrawSource implements DrawSource {
-  NsiDrawSource({http.Client Function()? clientFactory, String? platform})
-    : _clientFactory = clientFactory ?? http.Client.new,
+  NsiDrawSource({
+    http.Client Function()? clientFactory,
+    String? platform,
+    this.downloadCap = maxDownloadBytes,
+    this.pageCap = maxPageBytes,
+    this.deadline = totalDeadline,
+  }) : _clientFactory = clientFactory ?? http.Client.new,
       _ua = AppConstants.userAgent(
         platform ?? (Platform.isIOS ? 'iOS' : 'Android'),
       );
@@ -90,28 +97,93 @@ class NsiDrawSource implements DrawSource {
   final http.Client Function() _clientFactory;
   final String _ua;
 
+  /// The bounds in force; the defaults below in production, smaller in
+  /// tests so a test needn't stream 200 MB.
+  final int downloadCap;
+  final int pageCap;
+  final Duration deadline;
+
+  /// Longest silence between two chunks.
   static const Duration _timeout = Duration(seconds: 30);
+
+  /// Size and time bounds (security audit M-1). Real files, 14 Nov 2026:
+  /// downloads page ~96 KB; winners ZIP 33.6 MB; unclaimed ZIP 12.4 MB.
+  static const int maxPageBytes = 2 * 1024 * 1024;
+  static const int maxDownloadBytes = 200 * 1024 * 1024;
+  static const Duration totalDeadline = Duration(minutes: 10);
+  static const int maxRedirects = 5;
+
+  static const String tooLarge =
+      'NS&I\'s file is much larger than expected, so Bondbell stopped the '
+      'download. Please check on NS&I\'s site instead.';
+  static const String tooSlow =
+      'The download is taking far longer than it should, so Bondbell '
+      'stopped it. Please try again later.';
+  static const String offSite =
+      'NS&I\'s site sent Bondbell somewhere other than nsandi.com, so it '
+      'stopped. Please check on NS&I\'s site instead.';
 
   @override
   bool get isSample => false;
 
   Map<String, String> get _headers => <String, String>{'User-Agent': _ua};
 
+  /// Sends [method] to [url], following redirects itself so that EVERY hop
+  /// must be https on nsandi.com (security audit L-1; package:http would
+  /// otherwise follow up to five redirects to any host).
+  Future<http.StreamedResponse> _send(
+    http.Client c,
+    String method,
+    Uri url,
+  ) async {
+    Uri at = url;
+    for (int hop = 0; ; hop++) {
+      if (at.scheme != 'https' || !NsiIndexParser.isNsiHost(at.host)) {
+        throw const SourceException(offSite, layoutChanged: true);
+      }
+      final http.Request req = http.Request(method, at)
+        ..followRedirects = false
+        ..headers.addAll(_headers);
+      final http.StreamedResponse r = await c.send(req).timeout(_timeout);
+      if (r.statusCode < 300 || r.statusCode >= 400) return r;
+      final String? loc = r.headers['location'];
+      await r.stream.drain<void>().catchError((Object _) {});
+      if (loc == null || hop >= maxRedirects) {
+        throw SourceException(
+          'NS&I\'s site answered with an error (${r.statusCode}). '
+          'Try again in a little while.',
+        );
+      }
+      at = at.resolve(loc);
+    }
+  }
+
   @override
   Future<NsiIndex> fetchIndex() async {
     final http.Client c = _clientFactory();
     try {
       final Uri page = Uri.parse(AppConstants.nsiDownloadsPage);
-      final http.Response r = await c
-          .get(page, headers: _headers)
-          .timeout(_timeout);
+      final http.StreamedResponse r = await _send(c, 'GET', page);
       if (r.statusCode != 200) {
         throw SourceException(
           'NS&I\'s site answered with an error (${r.statusCode}). '
           'Try again in a little while.',
         );
       }
-      final NsiIndex index = NsiIndexParser.parse(r.body, page);
+      final BytesBuilder body = BytesBuilder(copy: false);
+      await for (final List<int> chunk
+          in r.stream.timeout(_timeout).timeout(_timeout * 2)) {
+        body.add(chunk);
+        if (body.length > pageCap) {
+          throw const SourceException(
+            'NS&I\'s downloads page is far larger than expected. The page '
+            'may have changed. You can still open it and check there.',
+            layoutChanged: true,
+          );
+        }
+      }
+      final String html = utf8.decode(body.takeBytes(), allowMalformed: true);
+      final NsiIndex index = NsiIndexParser.parse(html, page);
       if (index.draws.isEmpty) {
         throw const SourceException(
           'Bondbell couldn\'t find the winning-numbers files on NS&I\'s '
@@ -129,7 +201,7 @@ class NsiDrawSource implements DrawSource {
         'again.',
       );
     } on Object catch (e) {
-      debugPrint('fetchIndex: $e');
+      appLog('fetchIndex: ${e.runtimeType}');
       throw const SourceException(
         'Couldn\'t reach NS&I\'s site. Check your internet connection and '
         'try again.',
@@ -143,9 +215,8 @@ class NsiDrawSource implements DrawSource {
   Future<int?> sizeOf(RemoteList list) async {
     final http.Client c = _clientFactory();
     try {
-      final http.Response r = await c
-          .head(list.url, headers: _headers)
-          .timeout(_timeout);
+      final http.StreamedResponse r = await _send(c, 'HEAD', list.url);
+      await r.stream.drain<void>().catchError((Object _) {});
       if (r.statusCode != 200) return null;
       return int.tryParse(r.headers['content-length'] ?? '');
     } on Object {
@@ -181,9 +252,7 @@ class NsiDrawSource implements DrawSource {
     IOSink? sink;
     cancel?.onCancel(c.close);
     try {
-      final http.Request req = http.Request('GET', list.url)
-        ..headers.addAll(_headers);
-      final http.StreamedResponse r = await c.send(req).timeout(_timeout);
+      final http.StreamedResponse r = await _send(c, 'GET', list.url);
       if (r.statusCode != 200) {
         throw SourceException(
           'NS&I\'s site didn\'t send the file (error ${r.statusCode}). Try '
@@ -195,6 +264,10 @@ class NsiDrawSource implements DrawSource {
         throw const SourceException(webPageInsteadOfFile, layoutChanged: true);
       }
       final int? total = r.contentLength;
+      if (total != null && total > downloadCap) {
+        throw const SourceException(tooLarge, layoutChanged: true);
+      }
+      final Stopwatch clock = Stopwatch()..start();
       sink = out.openWrite();
       int received = 0;
       // The first bytes must be the ZIP signature "PK". They are held back
@@ -207,6 +280,14 @@ class NsiDrawSource implements DrawSource {
           throw const DownloadCancelledException();
         }
         received += chunk.length;
+        // Checked per chunk, before writing: a chunked or lying response
+        // can't fill the disk, and a trickle can't run for ever.
+        if (received > downloadCap) {
+          throw const SourceException(tooLarge, layoutChanged: true);
+        }
+        if (clock.elapsed > deadline) {
+          throw const SourceException(tooSlow);
+        }
         if (!checkedMagic) {
           head.addAll(chunk);
           if (head.length < 2) continue;
@@ -241,7 +322,7 @@ class NsiDrawSource implements DrawSource {
         throw const DownloadCancelledException();
       }
       if (e is SourceException || e is DownloadCancelledException) rethrow;
-      debugPrint('download: $e');
+      appLog('download: ${e.runtimeType}');
       if (e is TimeoutException) {
         throw const SourceException(
           'The download stalled. Check your connection and try again.',

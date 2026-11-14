@@ -218,6 +218,10 @@ class _RangeSheetState extends ConsumerState<_RangeSheet> {
   String? _error;
   bool _submitted = false;
 
+  /// True while a save is running: a double tap on Save, or Save plus the
+  /// keyboard's Done, must add the range once (code review m7).
+  bool _saving = false;
+
   @override
   void dispose() {
     _start.dispose();
@@ -228,22 +232,28 @@ class _RangeSheetState extends ConsumerState<_RangeSheet> {
   RangeResult get _result => BondRange.validate(_start.text, _end.text);
 
   Future<void> _save() async {
+    if (_saving) return;
     setState(() => _submitted = true);
     final RangeResult r = _result;
     if (r.error != null) {
       setState(() => _error = r.error);
       return;
     }
+    setState(() => _saving = true);
     final HoldersController ctrl = ref.read(holdersProvider.notifier);
-    if (widget.existing == null) {
-      await ctrl.addRange(widget.holderId, r.start!, r.end!);
-    } else {
-      await ctrl.updateRange(
-        widget.holderId,
-        widget.existing!.id,
-        r.start!,
-        r.end!,
-      );
+    try {
+      if (widget.existing == null) {
+        await ctrl.addRange(widget.holderId, r.start!, r.end!);
+      } else {
+        await ctrl.updateRange(
+          widget.holderId,
+          widget.existing!.id,
+          r.start!,
+          r.end!,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
     if (mounted) Navigator.of(context).pop();
   }
@@ -346,7 +356,10 @@ class _RangeSheetState extends ConsumerState<_RangeSheet> {
               ),
             ],
             const SizedBox(height: 20),
-            FilledButton(onPressed: _save, child: const Text('Save')),
+            FilledButton(
+              onPressed: _saving ? null : _save,
+              child: const Text('Save'),
+            ),
           ],
         ),
       ),

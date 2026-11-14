@@ -64,7 +64,7 @@ class HistoryScreen extends ConsumerWidget {
 
     final List<CheckRecord> draws = ref.watch(drawHistoryProvider);
     final List<Holder> holders = ref.watch(holdersProvider);
-    final int held = holders.fold(0, (int a, Holder h) => a + h.bondCount);
+    final int held = uniqueBondCount(holders);
     final WinStats stats = WinStats(draws, held);
     final double? pct = stats.annualisedPercent;
 

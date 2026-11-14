@@ -5,6 +5,8 @@ import 'package:bondbell/features/draws/engine/range_matcher.dart';
 import 'package:bondbell/features/draws/engine/scan_worker.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'helpers/fakes.dart';
+
 /// Synthetic text in the layout measured from NS&I's files (Nov 2026).
 const String winnersText = '''
 _______________________________________________________________________________________________
@@ -174,6 +176,67 @@ void main() {
           zipPath: f.path, kind: ListKind.winners, targets: sample);
       await expectLater(job.result, throwsA(isA<ScanException>()));
       d.deleteSync(recursive: true);
+    });
+  });
+
+  // ---- Fix round 2: security audit M-1 (inflate and line bounds) --------
+  group('M-1: bounded scan', () {
+    late Directory d;
+    setUp(() => d = Directory.systemTemp.createTempSync('bb_scan'));
+    tearDown(() => d.deleteSync(recursive: true));
+
+    test('a newline-free text is refused at the line cap, not buffered', () async {
+      final File f = File('${d.path}/a.zip')
+        ..writeAsBytesSync(buildZip('X.txt', 'A' * (ScanLimits.maxLineChars * 50)));
+      await expectLater(
+        scanZipFile(f, ListKind.winners, const <ScanTarget>[]),
+        throwsA(isA<ScanLimitException>()),
+      );
+    });
+
+    test('inflating past the declared size (+slack) is refused', () async {
+      final String text = '$winnersText\r\n${'652GW962089 ' * 8}\r\n' * 1;
+      final List<int> big = buildZip('X.txt', text + ('\r\n' * (2 * ScanLimits.declaredSlack)));
+      // Lie in the central directory: claim the entry is 100 bytes.
+      final List<int> z = List<int>.of(big);
+      int cd = -1;
+      for (int i = z.length - 22; i >= 0; i--) {
+        if (z[i] == 0x50 && z[i + 1] == 0x4b && z[i + 2] == 1 && z[i + 3] == 2) {
+          cd = i;
+          break;
+        }
+      }
+      z.setRange(cd + 24, cd + 28, <int>[100, 0, 0, 0]);
+      final File f = File('${d.path}/b.zip')..writeAsBytesSync(z);
+      await expectLater(
+        scanZipFile(f, ListKind.winners, const <ScanTarget>[]),
+        throwsA(isA<ScanLimitException>()),
+      );
+    });
+
+    test('the isolate reports a limit breach in words', () async {
+      final File f = File('${d.path}/c.zip')
+        ..writeAsBytesSync(buildZip('X.txt', 'A' * (ScanLimits.maxLineChars * 4)));
+      final ScanJob job = await ScanJob.start(
+          zipPath: f.path, kind: ListKind.winners, targets: const <ScanTarget>[]);
+      await expectLater(
+        job.result,
+        throwsA(isA<ScanException>().having(
+            (ScanException e) => e.message, 'message', contains('stopped reading'))),
+      );
+    });
+
+    test('BoundedLineSplitter matches LineSplitter on CRLF split across chunks',
+        () async {
+      final List<String> got = await Stream<String>.fromIterable(
+        <String>['a\r', '\nb\r\n', 'c', '\n\nd'],
+      ).transform(const BoundedLineSplitter(100)).toList();
+      expect(got, <String>['a', 'b', 'c', '', 'd']);
+    });
+
+    test('the bounds have headroom over the real files', () {
+      expect(ScanLimits.maxInflatedBytes, greaterThan(5 * 82 * 1024 * 1024));
+      expect(ScanLimits.maxLineChars, greaterThan(10 * 260));
     });
   });
 }

@@ -46,6 +46,8 @@ void main() {
     if (dir.existsSync()) dir.deleteSync(recursive: true);
   });
 
+  DateTime now = DateTime(2026, 11, 20, 10);
+
   Future<ProviderContainer> make({bool pro = true, String h = holders}) async {
     SharedPreferences.setMockInitialValues(<String, Object>{'real.holders': h});
     final ProviderContainer c = ProviderContainer(
@@ -55,6 +57,7 @@ void main() {
         ),
         liveDrawSourceProvider.overrideWithValue(source),
         forceProProvider.overrideWithValue(pro),
+        indexClockProvider.overrideWithValue(() => now),
       ],
     );
     addTearDown(c.dispose);
@@ -347,5 +350,109 @@ void main() {
     await c.read(appSettingsProvider.notifier).setSampleMode(false);
     expect(c.read(recordsProvider).keys, <String>['2026-11']);
     expect(c.read(holdersProvider).map((h) => h.id), <String>['me', 'gran']);
+  });
+
+  // ---- Fix round 2 -------------------------------------------------------
+
+  NsiIndex months(List<String> ids) => NsiIndex(
+    draws: <RemoteList>[
+      for (final String id in ids)
+        RemoteList(
+          id: id,
+          label: NsiIndexParser.labelFor(id),
+          url: Uri.parse('https://www.nsandi.com/files/$id.zip'),
+        ),
+    ],
+    unclaimed: RemoteList(
+      id: 'unclaimed',
+      label: 'Unclaimed prizes',
+      url: Uri.parse('https://www.nsandi.com/files/u.zip'),
+    ),
+  );
+
+  group('M1: the index is not trusted for the whole session', () {
+    // The audit's specified regression test.
+    test('"latest" is re-fetched even with a cached index', () async {
+      source.index = months(<String>['2026-11']);
+      final ProviderContainer c = await make();
+      final CheckSessionController s = c.read(checkSessionProvider.notifier);
+      await s.prepare(const CheckRequest.draw('latest'));
+      expect(st(c).list!.id, '2026-11');
+      // Results day: NS&I now lists December.
+      source.index = months(<String>['2026-12', '2026-11']);
+      await s.prepare(const CheckRequest.draw('latest'));
+      expect(st(c).list!.id, '2026-12');
+      expect(source.fetches, 2);
+    });
+
+    test('a named month reuses a fresh index, refetches after the TTL', () async {
+      source.index = months(<String>['2026-11', '2026-10']);
+      final ProviderContainer c = await make();
+      final CheckSessionController s = c.read(checkSessionProvider.notifier);
+      await s.prepare(const CheckRequest.draw('2026-10'));
+      now = now.add(const Duration(minutes: 5));
+      await s.prepare(const CheckRequest.draw('2026-10'));
+      expect(source.fetches, 1);
+      now = now.add(IndexController.ttl);
+      await s.prepare(const CheckRequest.draw('2026-10'));
+      expect(source.fetches, 2);
+    });
+
+    test('crossing a results day makes the index stale even within the TTL',
+        () async {
+      // 1 Dec 2026 is the first working day; results are due 2 Dec.
+      now = DateTime(2026, 12, 1, 23, 58);
+      source.index = months(<String>['2026-11']);
+      final ProviderContainer c = await make();
+      await c.read(indexProvider.notifier).ensure();
+      now = DateTime(2026, 12, 2, 0, 3);
+      expect(c.read(indexProvider.notifier).isStale(), isTrue);
+      source.index = months(<String>['2026-12', '2026-11']);
+      final NsiIndex i = await c.read(indexProvider.notifier).ensure();
+      expect(i.latest!.id, '2026-12');
+    });
+
+    test('on resume a stale index is dropped (and nothing is fetched)',
+        () async {
+      source.index = months(<String>['2026-11']);
+      final ProviderContainer c = await make();
+      await c.read(indexProvider.notifier).ensure();
+      c.read(indexProvider.notifier).dropIfStale();
+      expect(c.read(indexProvider).value, isNotNull, reason: 'still fresh');
+      now = now.add(const Duration(hours: 1));
+      c.read(indexProvider.notifier).dropIfStale();
+      expect(c.read(indexProvider).value, isNull);
+      expect(source.fetches, 1);
+    });
+  });
+
+  // Regression (code review m3): the month printed in the file was never
+  // compared with the month the link claimed to be.
+  test('m3: a link whose file is for another month is refused, nothing saved',
+      () async {
+    source.index = months(<String>['2026-12', '2026-11']);
+    source.zips['2026-12'] = buildZip('PWREP.txt', goodWinners); // November's
+    final ProviderContainer c = await make();
+    final CheckSessionController s = c.read(checkSessionProvider.notifier);
+    await s.prepare(const CheckRequest.draw('2026-12'));
+    await s.start();
+    expect(st(c).phase, CheckPhase.failed);
+    expect(st(c).error, contains('leads to the November 2026 list'));
+    expect(st(c).layoutChanged, isTrue);
+    expect(c.read(recordsProvider), isEmpty);
+    expectNoFilesLeft();
+  });
+
+  test('m3: the matching month is accepted', () async {
+    source.index = months(<String>['2026-12', '2026-11']);
+    source.zips['2026-12'] = buildZip(
+      'PWREP.txt',
+      winnersFile(<int, List<String>>{25: <String>['312KM104000']}, month: 'December 2026'),
+    );
+    final ProviderContainer c = await make();
+    final CheckSessionController s = c.read(checkSessionProvider.notifier);
+    await s.prepare(const CheckRequest.draw('2026-12'));
+    await s.start();
+    expect(st(c).phase, CheckPhase.done, reason: st(c).error);
   });
 }

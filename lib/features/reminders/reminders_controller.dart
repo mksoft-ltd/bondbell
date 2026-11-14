@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../shared/widgets/common.dart';
 import '../settings/presentation/app_settings.dart';
 import 'reminder_service.dart';
+import '../../core/utils/app_log.dart';
 
 final Provider<bool> remindersEnabledProvider = Provider<bool>(
   (Ref ref) => ref.watch(
@@ -22,7 +23,7 @@ Future<void> enableReminders(BuildContext context, WidgetRef ref) async {
     granted = await service.requestPermission();
     if (granted) await service.scheduleUpcoming();
   } on Object catch (e) {
-    debugPrint('enableReminders: $e');
+    appLog('enableReminders: $e');
   }
   await ref.read(appSettingsProvider.notifier).setRemindersEnabled(granted);
   messenger.showSnackBar(
@@ -42,7 +43,7 @@ Future<void> disableReminders(WidgetRef ref) async {
   try {
     await ref.read(reminderServiceProvider).cancelAll();
   } on Object catch (e) {
-    debugPrint('disableReminders: $e');
+    appLog('disableReminders: $e');
   }
   await ref.read(appSettingsProvider.notifier).setRemindersEnabled(false);
 }

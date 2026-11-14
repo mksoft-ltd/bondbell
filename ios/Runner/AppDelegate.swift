@@ -18,5 +18,34 @@ import UserNotifications
   // happens here, not in didFinishLaunching.
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "BondbellBackupExclusion") {
+      BackupExclusion.register(messenger: registrar.messenger())
+    }
+  }
+}
+
+/// Marks the folder holding bond numbers and holder names as excluded from
+/// iCloud and computer backups (security audit L-2). The flag is set on the
+/// directory so it survives the atomic file replacements on every save.
+enum BackupExclusion {
+  static func register(messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(
+      name: "com.froggyeye.bondbell/backup", binaryMessenger: messenger)
+    channel.setMethodCallHandler { call, result in
+      guard call.method == "excludeFromBackup", let path = call.arguments as? String else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      var url = URL(fileURLWithPath: path, isDirectory: true)
+      do {
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try url.setResourceValues(values)
+        let check = try url.resourceValues(forKeys: [.isExcludedFromBackupKey])
+        result(check.isExcludedFromBackup ?? false)
+      } catch {
+        result(false)
+      }
+    }
   }
 }

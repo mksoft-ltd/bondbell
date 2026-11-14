@@ -321,16 +321,49 @@ void main() {
         ];
         ctrl(c).buyPro();
         clock.flushMicrotasks();
-        // in_app_purchase_android puts BillingResponse.toString() in message.
-        store.emit(<PurchaseDetails>[
-          purchaseUpdate(pro, PurchaseStatus.error,
-              errorMessage: 'BillingResponse.itemAlreadyOwned'),
-        ]);
+        // Regression (code review m1): the real plugin sends this with an
+        // EMPTY product id; it used to fall through to "didn't go through".
+        store.emit(<PurchaseDetails>[playAlreadyOwned()]);
         clock.flushMicrotasks();
         expect(store.restoreCalls, 1);
         expect(st(c).proOwned, isTrue);
         expect(st(c).notice, PurchaseNotice.restored);
         expect(st(c).busy, isFalse);
+        clock.elapse(PurchaseController.restoreWindow);
+        expect(st(c).notice, PurchaseNotice.restored,
+            reason: 'no "failed" after the recovery window');
+      });
+    });
+
+    test('"item already owned" on a tip consumes the stuck one and says try '
+        'again', () {
+      run((FakeAsync clock, ProviderContainer c) {
+        store.onRestore = () => <PurchaseDetails>[
+          purchaseUpdate(AppConstants.tipSmallId, PurchaseStatus.restored,
+              pendingComplete: false),
+        ];
+        ctrl(c).tip(AppConstants.tipSmallId);
+        clock.flushMicrotasks();
+        store.emit(<PurchaseDetails>[playAlreadyOwned()]);
+        clock.flushMicrotasks();
+        expect(store.consumed.single.productID, AppConstants.tipSmallId);
+        clock.elapse(PurchaseController.restoreWindow);
+        expect(st(c).notice, PurchaseNotice.tipCleared);
+        expect(st(c).busy, isFalse);
+        expect(st(c).proOwned, isFalse);
+      });
+    });
+
+    test('a billing flow that refuses to start triggers a quiet restore', () {
+      store.buyStarts = false;
+      store.onRestore = () => <PurchaseDetails>[
+        purchaseUpdate(pro, PurchaseStatus.restored),
+      ];
+      run((FakeAsync clock, ProviderContainer c) {
+        ctrl(c).buyPro();
+        clock.flushMicrotasks();
+        expect(store.restoreCalls, 1);
+        expect(st(c).proOwned, isTrue);
       });
     });
 
@@ -450,6 +483,12 @@ void main() {
         expect(st(c).busy, isFalse);
       });
     });
+  });
+
+  test('tips: Play buys without auto-consume, StoreKit with it (m2)', () {
+    expect(autoConsumeFor(TargetPlatform.android), isFalse);
+    expect(autoConsumeFor(TargetPlatform.iOS), isTrue,
+        reason: 'in_app_purchase_storekit asserts autoConsume');
   });
 
   group('tips (consumables)', () {

@@ -15,7 +15,7 @@ Future<void> seedScreenshotData(LocalStore store) async {
     holders.map((Holder h) => h.toJson()).toList(),
   );
   final String fp = holdingsFingerprint(holders);
-  final int held = holders.fold(0, (int a, Holder h) => a + h.bondCount);
+  final int held = uniqueBondCount(holders);
   CheckRecord rec(String id, String label, List<(String, int)> wins) =>
       CheckRecord(
         listId: id,

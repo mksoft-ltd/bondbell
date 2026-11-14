@@ -25,8 +25,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       title: 'Check your bonds without logging in',
       body:
           'Save your Premium Bond numbers once, from a statement or old '
-          'paper certificates. Each month Bondbell checks them against '
-          'the winning numbers for you. It works for a relative\'s bonds '
+          'paper certificates. Each month, check them against the '
+          'winning numbers in a tap. It works for a relative\'s bonds '
           'too.',
     ),
     (

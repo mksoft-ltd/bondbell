@@ -11,6 +11,7 @@ import 'package:in_app_purchase_android/in_app_purchase_android.dart'
 import '../../../core/constants/app_constants.dart';
 import '../../../core/storage/local_store.dart';
 import '../data/store_gateway.dart';
+import '../../../core/utils/app_log.dart';
 
 /// Overridden in `main()` with [NativeStoreGateway], in tests with a fake.
 final Provider<StoreGateway> storeGatewayProvider = Provider<StoreGateway>(
@@ -26,6 +27,10 @@ enum PurchaseNotice {
   restored,
   nothingToRestore,
   tipThanks,
+
+  /// A tip left unfinished by an earlier session blocked this one; it has
+  /// now been cleared, so the user can simply try again.
+  tipCleared,
   cancelled,
   failed,
   pending,
@@ -89,6 +94,11 @@ class PurchaseController extends Notifier<PurchaseState> {
   /// such an event belongs to the purchase in flight, and only to it.
   bool _purchasing = false;
 
+  /// The product id of the purchase in flight. Play reports errors (cancel,
+  /// "item already owned") with an EMPTY product id, so this is the only
+  /// way to tell what such an event is about (code review m1).
+  String? _purchasingId;
+
   StoreGateway get _store => ref.read(storeGatewayProvider);
   LocalStore get _local => ref.read(localStoreProvider);
 
@@ -128,7 +138,7 @@ class PurchaseController extends Notifier<PurchaseState> {
       try {
         if (await _store.isAvailable()) await _store.restorePurchases();
       } on Object catch (e) {
-        debugPrint('Silent restore failed: $e');
+        appLog('Silent restore failed: $e');
       }
     }
   }
@@ -159,7 +169,7 @@ class PurchaseController extends Notifier<PurchaseState> {
         },
       );
     } on Object catch (e) {
-      debugPrint('Store query failed: $e');
+      appLog('Store query failed: $e');
       if (ref.mounted) state = state.copyWith(storeAvailable: false);
     }
   }
@@ -179,13 +189,20 @@ class PurchaseController extends Notifier<PurchaseState> {
     }
     _setBusy();
     _purchasing = true;
+    _purchasingId = id;
     try {
       final bool started = consumable
           ? await _store.buyConsumable(product)
           : await _store.buyNonConsumable(product);
-      if (!started) _finish(PurchaseNotice.failed);
+      if (!started) {
+        _finish(PurchaseNotice.failed);
+        // Play's launchBillingFlow can refuse with ITEM_ALREADY_OWNED and
+        // nothing on the stream; a quiet restore delivers what is owned
+        // (Pro is then granted; a stuck tip is consumed).
+        unawaited(_quietRestore());
+      }
     } on Object catch (e) {
-      debugPrint('Purchase failed to start: $e');
+      appLog('Purchase failed to start: $e');
       _finish(PurchaseNotice.failed);
     }
   }
@@ -205,7 +222,7 @@ class PurchaseController extends Notifier<PurchaseState> {
       // Neither store signals "that was everything": wait briefly.
       await Future<void>.delayed(restoreWindow);
     } on Object catch (e) {
-      debugPrint('Restore failed: $e');
+      appLog('Restore failed: $e');
     }
     if (!ref.mounted) return;
     final bool found = _restoreFound;
@@ -224,7 +241,10 @@ class PurchaseController extends Notifier<PurchaseState> {
         case PurchaseStatus.purchased:
         case PurchaseStatus.restored:
           if (_isPlayPending(p)) {
-            _finish(PurchaseNotice.pending);
+            // Only tell the user when they asked (a buy or Restore). The
+            // silent launch restore re-reports a pending Play order on
+            // every launch, which would nag (review n4).
+            if (state.busy) _finish(PurchaseNotice.pending);
             break;
           }
           if (isPro) {
@@ -258,13 +278,50 @@ class PurchaseController extends Notifier<PurchaseState> {
           _finish(PurchaseNotice.cancelled);
         case PurchaseStatus.error:
           if (p.pendingCompletePurchase) await _complete(p);
-          if (isPro &&
-              (p.error?.message ?? '').toLowerCase().contains('alreadyowned')) {
-            unawaited(_store.restorePurchases());
-            break;
+          if ((p.error?.message ?? '').toLowerCase().contains('alreadyowned')) {
+            final String id = p.productID.isNotEmpty
+                ? p.productID
+                : (_purchasingId ?? '');
+            if (id == AppConstants.proProductId) {
+              // Restore delivers the owned Pro; it finishes with "restored".
+              unawaited(_recoverOwned(pro: true));
+              break;
+            }
+            if (AppConstants.tipIds.contains(id)) {
+              unawaited(_recoverOwned(pro: false));
+              break;
+            }
           }
           _finish(PurchaseNotice.failed);
       }
+    }
+  }
+
+  /// "Already owned" during a buy: ask the store what is owned. A restored
+  /// Pro is granted by the normal stream path; a restored tip is consumed
+  /// there, and the user is told to try again.
+  Future<void> _recoverOwned({required bool pro}) async {
+    final bool wasRestoring = _restoring;
+    _restoring = true;
+    _restoreFound = false;
+    try {
+      await _store.restorePurchases();
+      await Future<void>.delayed(restoreWindow);
+    } on Object catch (e) {
+      appLog('Recover owned failed: ${e.runtimeType}');
+    }
+    if (!ref.mounted) return;
+    final bool found = _restoreFound;
+    _restoring = wasRestoring;
+    if (pro && found) return; // "restored" was already shown.
+    _finish(pro ? PurchaseNotice.failed : PurchaseNotice.tipCleared);
+  }
+
+  Future<void> _quietRestore() async {
+    try {
+      if (await _store.isAvailable()) await _store.restorePurchases();
+    } on Object catch (e) {
+      appLog('Quiet restore failed: ${e.runtimeType}');
     }
   }
 
@@ -285,7 +342,7 @@ class PurchaseController extends Notifier<PurchaseState> {
       await _store.finishConsumable(p);
     } on Object catch (e) {
       // Retried on the next launch/restore, which re-delivers it.
-      debugPrint('finishConsumable failed: $e');
+      appLog('finishConsumable failed: $e');
     }
   }
 
@@ -293,7 +350,7 @@ class PurchaseController extends Notifier<PurchaseState> {
     try {
       await _store.completePurchase(p);
     } on Object catch (e) {
-      debugPrint('completePurchase failed: $e');
+      appLog('completePurchase failed: $e');
     }
   }
 
@@ -309,6 +366,7 @@ class PurchaseController extends Notifier<PurchaseState> {
   void _finish(PurchaseNotice notice) {
     _busyTimer?.cancel();
     _purchasing = false;
+    _purchasingId = null;
     if (!ref.mounted) return;
     state = state.copyWith(busy: false, notice: notice);
   }

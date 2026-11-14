@@ -130,3 +130,33 @@ class Holder {
   @override
   int get hashCode => Object.hash(id, name, Object.hashAll(ranges));
 }
+
+/// Distinct bonds across [holders]: the same number saved twice (under two
+/// holders, or twice under one) counts once. Overlapping ranges in a series
+/// are merged before counting. Used for every household total (code review
+/// m6); a holder's own total still uses [Holder.bondCount].
+int uniqueBondCount(Iterable<Holder> holders) {
+  final Map<String, List<(int, int)>> bySeries = <String, List<(int, int)>>{};
+  for (final Holder h in holders) {
+    for (final BondRange r in h.ranges) {
+      (bySeries[r.series] ??= <(int, int)>[]).add((r.start.serial, r.end.serial));
+    }
+  }
+  int total = 0;
+  for (final List<(int, int)> spans in bySeries.values) {
+    spans.sort(((int, int) a, (int, int) b) => a.$1.compareTo(b.$1));
+    int? lo;
+    int? hi;
+    for (final (int a, int b) in spans) {
+      if (hi != null && a <= hi + 1) {
+        if (b > hi) hi = b;
+      } else {
+        if (lo != null) total += hi! - lo + 1;
+        lo = a;
+        hi = b;
+      }
+    }
+    if (lo != null) total += hi! - lo + 1;
+  }
+  return total;
+}

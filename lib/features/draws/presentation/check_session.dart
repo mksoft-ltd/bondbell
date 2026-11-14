@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/calendar/results_calendar.dart';
 import '../../bonds/domain/bond_number.dart';
 import '../../bonds/domain/holder.dart';
 import '../../bonds/presentation/holders_controller.dart';
@@ -16,6 +17,7 @@ import '../engine/nsi_list_parser.dart';
 import '../engine/range_matcher.dart';
 import '../engine/scan_worker.dart';
 import 'records_controller.dart';
+import '../../../core/utils/app_log.dart';
 
 /// Overridable for tests. Real or sample by mode.
 final Provider<DrawSource> drawSourceProvider = Provider<DrawSource>((Ref ref) {
@@ -27,15 +29,59 @@ final Provider<DrawSource> liveDrawSourceProvider = Provider<DrawSource>(
   (Ref ref) => NsiDrawSource(),
 );
 
+/// "Now", injectable so tests can move the clock past a results day.
+final Provider<DateTime Function()> indexClockProvider =
+    Provider<DateTime Function()>((Ref ref) => DateTime.now);
+
 /// NS&I's current downloads index. Fetched on demand (opening the app does
 /// not touch nsandi.com until the user asks to check).
+///
+/// The copy is only trusted for a short while: a process kept alive across
+/// a results day must not keep offering last month as "the latest draw"
+/// (code review M1). See [isStale].
 class IndexController extends AsyncNotifier<NsiIndex?> {
+  /// How long a fetched index is reused for a non-"latest" request.
+  static const Duration ttl = Duration(minutes: 10);
+
+  DateTime? _fetchedAt;
+
+  DateTime _now() => ref.read(indexClockProvider)();
+
   @override
   Future<NsiIndex?> build() async {
     final DrawSource source = ref.watch(drawSourceProvider);
+    _fetchedAt = null;
     // Sample mode is local, so it can load straight away.
     if (source.isSample) return source.fetchIndex();
     return null;
+  }
+
+  /// True when the cached index may be out of date: older than [ttl], or
+  /// fetched before the most recent results day began.
+  bool isStale() {
+    final DateTime? at = _fetchedAt;
+    if (at == null) return true;
+    final DateTime now = _now();
+    if (now.difference(at) > ttl) return true;
+    return at.isBefore(latestResultsDayStart(now));
+  }
+
+  /// Midnight at the start of the most recent results day on or before
+  /// [now].
+  static DateTime latestResultsDayStart(DateTime now) {
+    final DateTime today = DateTime(now.year, now.month, now.day);
+    DateTime r = ResultsCalendar.resultsDay(now.year, now.month);
+    if (r.isAfter(today)) r = ResultsCalendar.resultsDay(now.year, now.month - 1);
+    return r;
+  }
+
+  /// The cached index if it is fresh (and [force] is false), otherwise a new
+  /// fetch. A sample index is local and never goes stale.
+  Future<NsiIndex> ensure({bool force = false}) async {
+    final NsiIndex? cached = state.value;
+    final bool sample = ref.read(drawSourceProvider).isSample;
+    if (cached != null && (sample || (!force && !isStale()))) return cached;
+    return refresh();
   }
 
   Future<NsiIndex> refresh() async {
@@ -43,11 +89,23 @@ class IndexController extends AsyncNotifier<NsiIndex?> {
     state = const AsyncLoading<NsiIndex?>();
     try {
       final NsiIndex i = await source.fetchIndex();
+      _fetchedAt = _now();
       state = AsyncData<NsiIndex?>(i);
       return i;
     } on Object catch (e, st) {
       state = AsyncError<NsiIndex?>(e, st);
       rethrow;
+    }
+  }
+
+  /// On resume: forget a stale live index so screens stop showing it (Home
+  /// then offers "Show available draws" again). Nothing is fetched here;
+  /// nsandi.com is only contacted on the user's tap.
+  void dropIfStale() {
+    if (ref.read(drawSourceProvider).isSample) return;
+    if (state.value != null && isStale()) {
+      _fetchedAt = null;
+      state = const AsyncData<NsiIndex?>(null);
     }
   }
 }
@@ -168,9 +226,12 @@ class CheckSessionController extends Notifier<CheckSessionState> {
     state = CheckSessionState(phase: CheckPhase.preparing, request: request);
     try {
       final DrawSource source = ref.read(drawSourceProvider);
-      final NsiIndex index =
-          ref.read(indexProvider).value ??
-          await ref.read(indexProvider.notifier).refresh();
+      // "Latest" always asks NS&I again: the newest list is the one thing
+      // that changes on results day.
+      final NsiIndex index = await ref
+          .read(indexProvider.notifier)
+          .ensure(force: request.kind == CheckKind.draw &&
+              request.drawId == 'latest');
       if (gen != _generation) return;
       // 'latest' resolves to whatever NS&I lists newest right now.
       if (request.kind == CheckKind.draw && request.drawId == 'latest') {
@@ -222,7 +283,7 @@ class CheckSessionController extends Notifier<CheckSessionState> {
       );
     } on Object catch (e) {
       if (gen != _generation) return;
-      debugPrint('prepare: $e');
+      appLog('prepare: $e');
       state = state.copyWith(
         phase: CheckPhase.failed,
         error: 'Something went wrong finding NS&I\'s list. Please try again.',
@@ -258,9 +319,11 @@ class CheckSessionController extends Notifier<CheckSessionState> {
         onProgress: (int got, int? total) {
           if (gen != _generation) return;
           final int? t = total ?? state.sizeBytes;
-          state = state.copyWith(
-            progress: t == null || t == 0 ? 0 : (got / t).clamp(0.0, 1.0),
-          );
+          final double p = t == null || t == 0 ? 0 : (got / t).clamp(0.0, 1.0);
+          // Whole-percent steps only: a 34 MB file arrives in ~500 chunks,
+          // and each state change rebuilds the check screen (review n1).
+          if ((p * 100).floor() == (state.progress * 100).floor()) return;
+          state = state.copyWith(progress: p);
         },
       );
       final int downloadMs = sw.elapsedMilliseconds;
@@ -276,6 +339,12 @@ class CheckSessionController extends Notifier<CheckSessionState> {
           if (gen == _generation) state = state.copyWith(progress: f);
         },
       );
+      // Cancelled while the isolate was spawning: _abortWork ran before
+      // _job was set, so kill it here (review n3).
+      if (gen != _generation) {
+        job.cancel();
+        return;
+      }
       final ScanSummary summary = await job.result;
       _job = null;
       // Timings and sizes only; no bond numbers leave this line.
@@ -293,6 +362,19 @@ class CheckSessionController extends Notifier<CheckSessionState> {
               'Bondbell couldn\'t read any bond numbers from NS&I\'s file. '
               'Its format may have changed. Please check on NS&I\'s site '
               'instead.',
+          layoutChanged: true,
+        );
+        return;
+      }
+      final String? monthError = monthMismatch(
+        request,
+        summary,
+        sample: source.isSample,
+      );
+      if (monthError != null) {
+        state = state.copyWith(
+          phase: CheckPhase.failed,
+          error: monthError,
           layoutChanged: true,
         );
         return;
@@ -330,7 +412,7 @@ class CheckSessionController extends Notifier<CheckSessionState> {
         );
       }
     } on Object catch (e) {
-      debugPrint('check: $e');
+      appLog('check: $e');
       if (gen == _generation) {
         state = state.copyWith(
           phase: CheckPhase.failed,
@@ -370,8 +452,33 @@ class CheckSessionController extends Notifier<CheckSessionState> {
     try {
       if (f.existsSync()) f.deleteSync();
     } on Object catch (e) {
-      debugPrint('delete download: $e');
+      appLog('delete download: $e');
     }
+  }
+
+  /// The winners file names its own month in its heading. If that is not
+  /// the month the link was labelled with (NS&I's page is hand-edited), the
+  /// result would be filed under the wrong month, so refuse it (code review
+  /// m3). Returns the message to show, or null when it matches. The bundled
+  /// sample's heading is deliberately not a real month, so it is exempt.
+  @visibleForTesting
+  static String? monthMismatch(
+    CheckRequest request,
+    ScanSummary summary, {
+    required bool sample,
+  }) {
+    if (request.kind != CheckKind.draw || sample) return null;
+    final String expected = NsiIndexParser.labelFor(request.drawId!);
+    String norm(String s) => s.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
+    final String? found = summary.drawLabel;
+    if (found != null && norm(found) == norm(expected)) return null;
+    return found == null
+        ? 'NS&I\'s file for $expected doesn\'t say which draw it is for, so '
+              'Bondbell can\'t be sure it\'s the right list. Please check on '
+              'NS&I\'s site instead.'
+        : 'NS&I\'s link for $expected leads to the $found list. Bondbell has '
+              'not saved anything, so results aren\'t filed under the wrong '
+              'month. Please check on NS&I\'s site instead.';
   }
 
   /// Defence in depth: the screens already hide these behind Pro.
@@ -442,8 +549,9 @@ class CheckSessionController extends Notifier<CheckSessionState> {
       integrityOk: s.integrityOk,
       bondsChecked: single
           ? 1
-          : holders.fold(0, (int a, Holder h) => a + h.bondCount),
+          : uniqueBondCount(holders),
       singleNumber: single ? request.single.toString() : null,
+      sourceUrl: list.url.toString(),
     );
   }
 }

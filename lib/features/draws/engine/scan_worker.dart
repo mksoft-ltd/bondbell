@@ -7,6 +7,29 @@ import 'nsi_list_parser.dart';
 import 'range_matcher.dart';
 import 'zip_entry_stream.dart';
 
+/// Bounds on what the scan will read (security audit M-1). Real files,
+/// Nov 2026: winners 82 MB of text, unclaimed 35 MB; the longest line is
+/// the ~250-character notes line, data lines are under 100.
+abstract final class ScanLimits {
+  /// Never inflate past this, whatever the ZIP claims.
+  static const int maxInflatedBytes = 512 * 1024 * 1024;
+
+  /// Slack allowed over the entry's declared uncompressed size.
+  static const int declaredSlack = 1024 * 1024;
+
+  /// A line longer than this is not NS&I's layout (and an unbroken one is
+  /// how a small ZIP would ask for a huge string).
+  static const int maxLineChars = 4096;
+}
+
+/// The list broke a [ScanLimits] bound; its message is shown to the user.
+class ScanLimitException implements Exception {
+  const ScanLimitException(this.message);
+  final String message;
+  @override
+  String toString() => message;
+}
+
 /// Scans one downloaded NS&I ZIP against the user's ranges, streaming:
 /// compressed bytes → raw inflate → Latin-1 → lines → token check. Nothing
 /// but the matches is kept, so memory stays flat however big the list is.
@@ -19,8 +42,14 @@ Future<ScanSummary> scanZipFile(
   final ZipEntryStream entry = await ZipEntryStream.open(zip);
   final NsiListParser parser = NsiListParser(kind, RangeMatcher(targets));
   final int total = entry.compressedSize == 0 ? 1 : entry.compressedSize;
+  final int declared = entry.uncompressedSize;
+  final int inflateCap = declared > 0 &&
+          declared + ScanLimits.declaredSlack < ScanLimits.maxInflatedBytes
+      ? declared + ScanLimits.declaredSlack
+      : ScanLimits.maxInflatedBytes;
+  int inflated = 0;
   int lastReported = -1;
-  await for (final String line in entry
+  final Stream<List<int>> bytes = entry
       .bytes(
         onCompressedBytes: (int read) {
           final int pct = read * 100 ~/ total;
@@ -30,11 +59,71 @@ Future<ScanSummary> scanZipFile(
           }
         },
       )
+      .map((List<int> chunk) {
+        inflated += chunk.length;
+        if (inflated > inflateCap) {
+          throw const ScanLimitException(
+            'NS&I\'s file unpacks to far more than expected, so Bondbell '
+            'stopped reading it.',
+          );
+        }
+        return chunk;
+      });
+  await for (final String line in bytes
       .transform(latin1.decoder)
-      .transform(const LineSplitter())) {
+      .transform(const BoundedLineSplitter(ScanLimits.maxLineChars))) {
     parser.addLine(line);
   }
   return parser.finish(entry.name);
+}
+
+/// Splits text into lines like [LineSplitter] (\n, \r\n or \r), but
+/// throws instead of buffering a line longer than [maxChars].
+class BoundedLineSplitter extends StreamTransformerBase<String, String> {
+  const BoundedLineSplitter(this.maxChars);
+  final int maxChars;
+
+  @override
+  Stream<String> bind(Stream<String> stream) async* {
+    final StringBuffer partial = StringBuffer();
+    bool lastWasCr = false;
+    await for (final String chunk in stream) {
+      int start = 0;
+      for (int i = 0; i < chunk.length; i++) {
+        final int c = chunk.codeUnitAt(i);
+        if (c == 10 || c == 13) {
+          if (c == 10 && lastWasCr && i == start && partial.isEmpty) {
+            // The \n of a \r\n split across chunks: already ended.
+            lastWasCr = false;
+            start = i + 1;
+            continue;
+          }
+          partial.write(chunk.substring(start, i));
+          yield partial.toString();
+          partial.clear();
+          lastWasCr = c == 13;
+          if (c == 13 && i + 1 < chunk.length && chunk.codeUnitAt(i + 1) == 10) {
+            i++;
+            lastWasCr = false;
+          }
+          start = i + 1;
+        } else {
+          lastWasCr = false;
+        }
+      }
+      if (start < chunk.length) {
+        partial.write(chunk.substring(start));
+        lastWasCr = false;
+      }
+      if (partial.length > maxChars) {
+        throw const ScanLimitException(
+          'NS&I\'s file has a line far longer than its usual layout, so '
+          'Bondbell stopped reading it.',
+        );
+      }
+    }
+    if (partial.isNotEmpty) yield partial.toString();
+  }
 }
 
 /// Runs [scanZipFile] on a background isolate so the UI never stutters,
@@ -54,13 +143,19 @@ class ScanJob {
   }) async {
     final ReceivePort port = ReceivePort();
     final Completer<ScanSummary> completer = Completer<ScanSummary>();
-    final Isolate isolate = await Isolate.spawn<_ScanRequest>(
-      _entry,
-      _ScanRequest(port.sendPort, zipPath, kind, targets),
-      onError: port.sendPort,
-      onExit: port.sendPort,
-      debugName: 'bondbell-scan',
-    );
+    final Isolate isolate;
+    try {
+      isolate = await Isolate.spawn<_ScanRequest>(
+        _entry,
+        _ScanRequest(port.sendPort, zipPath, kind, targets),
+        onError: port.sendPort,
+        onExit: port.sendPort,
+        debugName: 'bondbell-scan',
+      );
+    } on Object {
+      port.close(); // review n3: never leak the port when spawn fails.
+      rethrow;
+    }
     late final ScanJob job;
     port.listen((Object? msg) {
       if (completer.isCompleted) return;
@@ -99,6 +194,8 @@ class ScanJob {
         onProgress: r.reply.send,
       );
       r.reply.send(s);
+    } on ScanLimitException catch (e) {
+      r.reply.send(_ScanFailure(e.message));
     } on ZipFormatException catch (e) {
       r.reply.send(_ScanFailure('The file is not in the expected format '
           '(${e.message}).'));

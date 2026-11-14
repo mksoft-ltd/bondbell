@@ -14,7 +14,7 @@ class BondsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ThemeData t = Theme.of(context);
     final List<Holder> holders = ref.watch(holdersProvider);
-    final int total = holders.fold(0, (int a, Holder h) => a + h.bondCount);
+    final int total = uniqueBondCount(holders);
 
     return Scaffold(
       appBar: AppBar(title: const Text('My bonds')),

@@ -1,9 +1,11 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:bondbell/core/storage/local_store.dart';
 import 'package:bondbell/features/bonds/presentation/holders_controller.dart';
 import 'package:bondbell/features/draws/data/draw_source.dart';
 import 'package:bondbell/features/draws/data/nsi_index.dart';
+import 'package:bondbell/features/draws/engine/zip_entry_stream.dart';
 import 'package:bondbell/features/draws/domain/check_models.dart';
 import 'package:bondbell/features/draws/presentation/check_session.dart';
 import 'package:bondbell/features/draws/presentation/records_controller.dart';
@@ -11,6 +13,8 @@ import 'package:bondbell/features/purchases/presentation/purchase_controller.dar
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'helpers/fakes.dart';
 
 /// Serves the bundled synthetic ZIPs as if they were NS&I's two latest
 /// months, and records every file it hands out.
@@ -37,10 +41,20 @@ class FakeSource implements DrawSource {
   @override
   Future<File> download(RemoteList list,
       {void Function(int, int?)? onProgress, DownloadCancel? cancel}) async {
-    final String src = list.id == 'unclaimed'
-        ? 'assets/sample/sample_unclaimed.zip'
-        : 'assets/sample/sample_winners.zip';
-    final File f = File(src).copySync('${dir.path}/${list.id}-${handedOut.length}.zip');
+    final String dest = '${dir.path}/${list.id}-${handedOut.length}.zip';
+    final File f;
+    if (list.id == 'unclaimed') {
+      f = File('assets/sample/sample_unclaimed.zip').copySync(dest);
+    } else {
+      // The sample winners text, re-headed with the month this link is
+      // for, as NS&I's real files are (the app checks the two agree).
+      final ZipEntryStream e =
+          await ZipEntryStream.open(File('assets/sample/sample_winners.zip'));
+      final String text = await e.bytes().transform(latin1.decoder).join();
+      f = File(dest)
+        ..writeAsBytesSync(buildZip(
+            'PWREP.txt', text.replaceFirst('Sample 2026', NsiIndexParser.labelFor(list.id))));
+    }
     handedOut.add(f);
     onProgress?.call(1, 1);
     return f;

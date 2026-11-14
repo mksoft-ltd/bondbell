@@ -320,4 +320,166 @@ void main() {
     await clearScratch();
     expect(leftovers(), isEmpty);
   });
+
+  // ---- Fix round 2: security audit M-1 (size/time bounds) and L-1 --------
+
+  group('M-1: bounded downloads', () {
+    test('production bounds leave headroom over the real files', () {
+      // Winners ZIP 33.6 MB, page ~96 KB (14 Nov 2026).
+      expect(NsiDrawSource.maxDownloadBytes, greaterThan(5 * 34 * 1024 * 1024));
+      expect(NsiDrawSource.maxPageBytes, greaterThan(10 * 100 * 1024));
+      expect(NsiDrawSource.totalDeadline, greaterThanOrEqualTo(const Duration(minutes: 5)));
+    });
+
+    test('a chunked body with no length stops near the cap, nothing kept',
+        () async {
+      const int cap = 256 * 1024;
+      final List<int> chunk = List<int>.filled(64 * 1024, 0);
+      int sent = 0;
+      final MockClient c = MockClient.streaming((http.BaseRequest r, _) async {
+        Stream<List<int>> body() async* {
+          yield <int>[0x50, 0x4b];
+          for (int i = 0; i < 400; i++) {
+            sent += chunk.length;
+            yield chunk;
+          }
+        }
+
+        return http.StreamedResponse(body(), 200,
+            headers: const <String, String>{'content-type': 'application/zip'});
+      });
+      await expectLater(
+        NsiDrawSource(clientFactory: () => c, platform: 'iOS', downloadCap: cap)
+            .download(list),
+        throwsA(isA<SourceException>().having((SourceException e) => e.message,
+            'message', NsiDrawSource.tooLarge)),
+      );
+      // Offered 25 MB; the source stopped pulling within a chunk or two of
+      // the cap (a bound the code guarantees, not "cap + 64 KB").
+      expect(sent, lessThan(cap + 4 * chunk.length));
+      expect(leftovers(), isEmpty);
+    });
+
+    test('a declared length over the cap is refused before writing', () async {
+      await expectLater(
+        NsiDrawSource(
+          clientFactory: () => streaming(<List<int>>[zip], contentLength: 10 * 1024 * 1024),
+          platform: 'iOS',
+          downloadCap: 1024 * 1024,
+        ).download(list),
+        throwsA(isA<SourceException>().having((SourceException e) => e.message,
+            'message', NsiDrawSource.tooLarge)),
+      );
+      expect(leftovers(), isEmpty);
+    });
+
+    test('a trickle that outlasts the overall deadline is stopped', () async {
+      final MockClient c = MockClient.streaming((http.BaseRequest r, _) async {
+        Stream<List<int>> body() async* {
+          yield zip.sublist(0, 4);
+          for (int i = 0; i < 50; i++) {
+            await Future<void>.delayed(const Duration(milliseconds: 20));
+            yield <int>[0];
+          }
+        }
+
+        return http.StreamedResponse(body(), 200,
+            headers: const <String, String>{'content-type': 'application/zip'});
+      });
+      await expectLater(
+        NsiDrawSource(
+          clientFactory: () => c,
+          platform: 'iOS',
+          deadline: const Duration(milliseconds: 100),
+        ).download(list),
+        throwsA(isA<SourceException>().having((SourceException e) => e.message,
+            'message', NsiDrawSource.tooSlow)),
+      );
+      expect(leftovers(), isEmpty);
+    });
+
+    test('an oversized downloads page is refused', () async {
+      final MockClient c = MockClient.streaming((http.BaseRequest r, _) async {
+        Stream<List<int>> body() async* {
+          for (int i = 0; i < 100; i++) {
+            yield List<int>.filled(16 * 1024, 0x20);
+          }
+        }
+
+        return http.StreamedResponse(body(), 200,
+            headers: const <String, String>{'content-type': 'text/html'});
+      });
+      await expectLater(
+        NsiDrawSource(clientFactory: () => c, platform: 'iOS', pageCap: 64 * 1024)
+            .fetchIndex(),
+        throwsA(isA<SourceException>()
+            .having((SourceException e) => e.layoutChanged, 'layoutChanged', isTrue)
+            .having((SourceException e) => e.message, 'message', contains('far larger'))),
+      );
+    });
+  });
+
+  group('L-1: every redirect hop must stay on nsandi.com over https', () {
+    MockClient redirecting(String to, {List<Uri>? seen}) =>
+        MockClient.streaming((http.BaseRequest r, _) async {
+          seen?.add(r.url);
+          expect(r.followRedirects, isFalse,
+              reason: 'the source follows redirects itself');
+          if (r.url.path.endsWith('x-11-2026.zip')) {
+            return http.StreamedResponse(const Stream<List<int>>.empty(), 302,
+                headers: <String, String>{'location': to});
+          }
+          return http.StreamedResponse(Stream<List<int>>.value(zip), 200,
+              headers: const <String, String>{'content-type': 'application/zip'},
+              contentLength: zip.length);
+        });
+
+    for (final String target in <String>[
+      'https://evil.example.com/x.zip',
+      'http://www.nsandi.com/files/y.zip',
+      'https://nsandi.com.evil.example/y.zip',
+    ]) {
+      test('a redirect to $target is refused and nothing is fetched there',
+          () async {
+        final List<Uri> seen = <Uri>[];
+        await expectLater(
+          source(redirecting(target, seen: seen)).download(list),
+          throwsA(isA<SourceException>().having((SourceException e) => e.message,
+              'message', NsiDrawSource.offSite)),
+        );
+        expect(seen, hasLength(1), reason: 'the off-site hop is never requested');
+        expect(leftovers(), isEmpty);
+      });
+    }
+
+    test('a redirect within nsandi.com is followed', () async {
+      final List<Uri> seen = <Uri>[];
+      final File f = await source(redirecting(
+        'https://files.nsandi.com/files/y.zip',
+        seen: seen,
+      )).download(list);
+      expect(seen.last.host, 'files.nsandi.com');
+      expect(f.readAsBytesSync(), zip);
+      f.deleteSync();
+    });
+
+    test('a redirect loop gives up', () async {
+      final MockClient c = MockClient.streaming((http.BaseRequest r, _) async =>
+          http.StreamedResponse(const Stream<List<int>>.empty(), 302,
+              headers: <String, String>{'location': r.url.toString()}));
+      await expectLater(source(c).download(list), throwsA(isA<SourceException>()));
+    });
+
+    test('the downloads page and HEAD apply the same rule', () async {
+      final MockClient c = MockClient.streaming((http.BaseRequest r, _) async =>
+          http.StreamedResponse(const Stream<List<int>>.empty(), 301,
+              headers: const <String, String>{'location': 'https://evil.example.com/'}));
+      await expectLater(
+        source(c).fetchIndex(),
+        throwsA(isA<SourceException>().having((SourceException e) => e.message,
+            'message', NsiDrawSource.offSite)),
+      );
+      expect(await source(c).sizeOf(list), isNull);
+    });
+  });
 }
