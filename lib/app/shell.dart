@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../features/draws/presentation/check_session.dart';
 import '../features/settings/presentation/app_settings.dart';
 import '../shared/widgets/common.dart';
+import '../features/purchases/presentation/purchase_controller.dart';
 
 /// Bottom navigation on phones, a navigation rail on tablets and in
 /// landscape, with the sample-mode label above everything.
@@ -48,6 +49,7 @@ class AppShell extends ConsumerWidget {
       children: <Widget>[
         if (sample)
           SampleBanner(
+            proOpen: ref.watch(sampleOpensProProvider),
             onExit: () async {
               ref.read(checkSessionProvider.notifier).reset();
               await ref

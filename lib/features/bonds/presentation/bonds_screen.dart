@@ -88,7 +88,7 @@ class BondsScreen extends ConsumerWidget {
 /// Adds a holder, or explains that more than one is a Pro feature.
 Future<void> addHolderFlow(BuildContext context, WidgetRef ref) async {
   final List<Holder> holders = ref.read(holdersProvider);
-  final bool pro = ref.read(isProProvider);
+  final bool pro = ref.read(proFeaturesProvider);
   if (!pro && holders.length >= FreeTier.maxHolders) {
     final bool? go = await showDialog<bool>(
       context: context,

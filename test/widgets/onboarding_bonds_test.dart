@@ -1,6 +1,7 @@
 import 'package:bondbell/features/bonds/domain/holder.dart';
 import 'package:bondbell/features/bonds/presentation/holders_controller.dart';
 import 'package:bondbell/features/settings/presentation/app_settings.dart';
+import 'package:bondbell/shared/widgets/common.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -65,8 +66,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Sample mode: made-up numbers, not real results'),
           findsOneWidget);
-      expect(find.textContaining('20,050 bonds'), findsOneWidget);
-      expect(h.container.read(holdersProvider).single.id, 'sample-holder');
+      expect(find.textContaining('20,100 bonds'), findsOneWidget);
+      expect(find.textContaining('across 2 holders'), findsOneWidget);
+      expect(h.container.read(holdersProvider).map((Holder x) => x.id),
+          <String>['sample-holder', 'sample-grandad']);
+      // Item 8: the banner says Pro features are open (nothing was bought).
+      expect(find.text(SampleBanner.proNote), findsOneWidget);
     });
 
     testWidgets('the sample banner\'s Exit returns to the user\'s own (empty) '

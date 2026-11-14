@@ -169,15 +169,25 @@ class InfoNote extends StatelessWidget {
 /// The always-visible label in sample mode, so made-up numbers can never be
 /// mistaken for real results.
 class SampleBanner extends StatelessWidget {
-  const SampleBanner({super.key, this.onExit});
+  const SampleBanner({super.key, this.onExit, this.proOpen = false});
   final VoidCallback? onExit;
+
+  /// Sample mode is opening the Pro features (the user hasn't bought Pro):
+  /// say so, so nobody mistakes it for an unlock.
+  final bool proOpen;
+
+  /// Shown under the banner's first line when [proOpen]. Store review notes
+  /// quote this wording.
+  static const String proNote =
+      'Pro features are open so you can try them with sample data.';
 
   @override
   Widget build(BuildContext context) {
     final ThemeData t = Theme.of(context);
     return Semantics(
       container: true,
-      label: 'Sample mode. These are made-up numbers, not real results.',
+      label: 'Sample mode. These are made-up numbers, not real results.'
+          '${proOpen ? ' $proNote' : ''}',
       child: Material(
         color: t.colorScheme.secondaryContainer,
         child: SafeArea(
@@ -193,12 +203,24 @@ class SampleBanner extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: ExcludeSemantics(
-                    child: Text(
-                      'Sample mode: made-up numbers, not real results',
-                      style: t.textTheme.bodyMedium?.copyWith(
-                        color: t.colorScheme.onSecondaryContainer,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          'Sample mode: made-up numbers, not real results',
+                          style: t.textTheme.bodyMedium?.copyWith(
+                            color: t.colorScheme.onSecondaryContainer,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        if (proOpen)
+                          Text(
+                            proNote,
+                            style: t.textTheme.bodySmall?.copyWith(
+                              color: t.colorScheme.onSecondaryContainer,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),

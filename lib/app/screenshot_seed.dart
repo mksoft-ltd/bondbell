@@ -23,12 +23,18 @@ Future<void> seedScreenshotData(LocalStore store) async {
         checkedAt: DateTime.parse('$id-02T09:05:00Z'),
         fingerprint: fp,
         wins: <Win>[
-          for (final (String bond, int prize) in wins)
+          for (int i = 0; i < wins.length; i++)
             Win(
-              bond: bond,
-              prize: prize,
-              holderId: holders.first.id,
-              holderName: holders.first.name,
+              bond: wins[i].$1,
+              prize: wins[i].$2,
+              // Grandad's certificates are the 9JN series.
+              holderId: wins[i].$1.startsWith('9JN')
+                  ? holders.last.id
+                  : holders.first.id,
+              holderName: wins[i].$1.startsWith('9JN')
+                  ? holders.last.name
+                  : holders.first.name,
+              hit: i,
             ),
         ],
         numbersScanned: 6500000,
@@ -40,7 +46,9 @@ Future<void> seedScreenshotData(LocalStore store) async {
       ('312KM104217', 100),
       ('312KM104388', 25),
     ]),
+    // Matches the bundled October sample list.
     rec('2026-10', 'October 2026 (sample)', <(String, int)>[
+      ('9JN000120', 50),
       ('47DW185541', 25),
     ]),
     rec('2026-09', 'September 2026 (sample)', <(String, int)>[]),

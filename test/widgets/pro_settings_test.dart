@@ -6,6 +6,7 @@ import 'package:bondbell/features/bonds/presentation/holders_controller.dart';
 import 'package:bondbell/features/draws/domain/check_models.dart';
 import 'package:bondbell/features/draws/presentation/check_session.dart';
 import 'package:bondbell/features/draws/presentation/records_controller.dart';
+import 'package:bondbell/features/purchases/presentation/pro_screen.dart';
 import 'package:bondbell/features/purchases/presentation/purchase_controller.dart';
 import 'package:bondbell/features/settings/presentation/app_settings.dart';
 import 'package:flutter/material.dart';
@@ -355,6 +356,51 @@ void main() {
     testWidgets('Pro with nothing checked yet', (WidgetTester tester) async {
       await pumpBondbell(tester, forcePro: true, route: '/history');
       expect(find.text('Nothing checked yet'), findsOneWidget);
+    });
+  });
+
+  // Item 8: a store reviewer (who can't buy) reaches every Pro feature in
+  // sample mode; the purchase screens still show the real, unbought state.
+  group('sample mode opens Pro features for reviewers', () {
+    testWidgets('History, stats and the Pro screen in sample mode',
+        (WidgetTester tester) async {
+      final Harness h = await pumpBondbell(
+        tester,
+        prefs: <String, Object>{'settings.sampleMode': true},
+        route: '/history',
+      );
+      expect(find.text('History and stats are part of Pro'), findsNothing);
+      expect(find.text('Nothing checked yet'), findsOneWidget,
+          reason: 'History itself is open');
+      h.go('/pro');
+      await tester.pumpAndSettle();
+      expect(find.text(ProScreen.sampleNote), findsOneWidget);
+      await tester.scrollUntilVisible(find.text('Unlock Pro · £4.79'), 200);
+      expect(find.text('Unlock Pro · £4.79'), findsOneWidget,
+          reason: 'the real not-owned state, with the store price');
+      h.go('/settings');
+      await tester.pumpAndSettle();
+      expect(find.text('Bondbell Pro'), findsOneWidget);
+      expect(find.text('Bondbell Pro: unlocked'), findsNothing);
+      // Leaving sample mode locks History again.
+      await h.container.read(appSettingsProvider.notifier).setSampleMode(false);
+      h.go('/history');
+      await tester.pumpAndSettle();
+      expect(find.text('History and stats are part of Pro'), findsOneWidget);
+      expect(h.container.read(isProProvider), isFalse);
+    });
+
+    testWidgets('Home lists the earlier sample months to check',
+        (WidgetTester tester) async {
+      await pumpBondbell(
+        tester,
+        prefs: <String, Object>{'settings.sampleMode': true},
+        route: '/home',
+      );
+      await tester.scrollUntilVisible(find.text('October 2026 (sample)'), 200);
+      expect(find.text('October 2026 (sample)'), findsOneWidget);
+      expect(find.text('September 2026 (sample)'), findsOneWidget);
+      expect(find.text('About Bondbell Pro'), findsNothing);
     });
   });
 }

@@ -38,6 +38,12 @@ class ProScreen extends ConsumerWidget {
         ),
       ];
 
+  /// Shown in sample mode, where these features are open on the sample
+  /// data without a purchase (store reviewers can't buy).
+  static const String sampleNote =
+      'You\'re in sample mode, so these features are open to try on the '
+      'sample data. To use them with your own bonds, unlock Pro.';
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ThemeData t = Theme.of(context);
@@ -65,6 +71,10 @@ class ProScreen extends ConsumerWidget {
                 : 'One purchase, yours for good. No subscription.',
             style: t.textTheme.bodyLarge,
           ),
+          if (ref.watch(sampleOpensProProvider)) ...<Widget>[
+            const SizedBox(height: 16),
+            const InfoNote(ProScreen.sampleNote, icon: Icons.science_outlined),
+          ],
           const SizedBox(height: 20),
           for (final b in benefits)
             Padding(

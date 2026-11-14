@@ -16,6 +16,8 @@ import 'helpers/fakes.dart';
 /// Every free/Pro line in the spec's table, enforced in logic (providers
 /// and controllers), not only by what the screens choose to show.
 void main() {
+  // Sample mode reads the bundled sample lists through rootBundle.
+  TestWidgetsFlutterBinding.ensureInitialized();
   late Directory dir;
   late ScriptedSource source;
 
@@ -98,13 +100,67 @@ void main() {
       expect(c.read(holdersProvider).single.ranges, hasLength(6));
     });
 
-    test('sample mode applies the same limit', () async {
+    // Item 8 (Play "full access" for reviewers, who can't buy): sample
+    // mode opens every Pro feature on the sample data. Before this, sample
+    // mode applied the free limits, so History, earlier draws, bulk
+    // unclaimed and extra holders were locked for a reviewer.
+    test('sample mode opens the holder limit on the sample data only',
+        () async {
       final ProviderContainer c = await make(sample: true);
-      expect(c.read(sampleModeProvider), isTrue);
+      expect(c.read(proFeaturesProvider), isTrue);
+      expect(c.read(isProProvider), isFalse, reason: 'the entitlement is real');
+      await c.read(holdersProvider.notifier).addHolder('Sam (sample)');
+      expect(c.read(holdersProvider), hasLength(3)); // 2 sample + Sam
+      await c.read(appSettingsProvider.notifier).setSampleMode(false);
+      expect(c.read(proFeaturesProvider), isFalse);
+      expect(c.read(holdersProvider).map((h) => h.id), <String>['h'],
+          reason: 'real data untouched');
       await expectLater(
         c.read(holdersProvider.notifier).addHolder('Gran'),
         throwsA(isA<FreeTierLimitException>()),
+        reason: 'real data is still gated after leaving sample mode',
       );
+    });
+  });
+
+  group('item 8: sample mode opens Pro features, never the entitlement', () {
+    test('every Pro check opens in sample mode: earlier draw, bulk unclaimed',
+        () async {
+      final ProviderContainer c = await make(sample: true);
+      final CheckSessionController s = c.read(checkSessionProvider.notifier);
+      await s.prepare(const CheckRequest.draw('2026-10'));
+      expect(c.read(checkSessionProvider).phase, CheckPhase.ready,
+          reason: c.read(checkSessionProvider).error);
+      expect(c.read(checkSessionProvider).list!.label, 'October 2026 (sample)');
+      await s.prepare(const CheckRequest.unclaimedAll());
+      expect(c.read(checkSessionProvider).phase, CheckPhase.ready,
+          reason: c.read(checkSessionProvider).error);
+    });
+
+    test('leaving sample mode restores the real gates', () async {
+      final ProviderContainer c = await make(sample: true);
+      await c.read(appSettingsProvider.notifier).setSampleMode(false);
+      final CheckSessionController s = c.read(checkSessionProvider.notifier);
+      await s.prepare(const CheckRequest.draw('2026-10'));
+      expect(c.read(checkSessionProvider).error, contains('Pro'));
+      await s.prepare(const CheckRequest.unclaimedAll());
+      expect(c.read(checkSessionProvider).error, contains('Pro'));
+      expect(source.handedOut, isEmpty);
+    });
+
+    test('the persisted Pro flag is never written by sample mode', () async {
+      final ProviderContainer c = await make(sample: true);
+      c.read(proFeaturesProvider);
+      await c.read(holdersProvider.notifier).addHolder('Sam (sample)');
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool(PurchaseController.proKey), isNull);
+      expect(c.read(purchaseControllerProvider).proOwned, isFalse);
+      expect(c.read(sampleOpensProProvider), isTrue);
+    });
+
+    test('with real Pro, the sample note is not shown', () async {
+      final ProviderContainer c = await make(sample: true, pro: true);
+      expect(c.read(sampleOpensProProvider), isFalse);
     });
   });
 

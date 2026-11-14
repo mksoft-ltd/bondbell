@@ -36,7 +36,7 @@ class HistoryScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ThemeData t = Theme.of(context);
-    final bool pro = ref.watch(isProProvider);
+    final bool pro = ref.watch(proFeaturesProvider);
     if (!pro) {
       return Scaffold(
         appBar: AppBar(title: const Text('History')),

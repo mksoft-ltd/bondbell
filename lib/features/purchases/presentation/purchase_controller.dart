@@ -10,6 +10,7 @@ import 'package:in_app_purchase_android/in_app_purchase_android.dart'
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/storage/local_store.dart';
+import '../../settings/presentation/app_settings.dart';
 import '../data/store_gateway.dart';
 import '../../../core/utils/app_log.dart';
 
@@ -416,6 +417,24 @@ final Provider<bool> isProProvider = Provider<bool>(
       ref.watch(
         purchaseControllerProvider.select((PurchaseState s) => s.proOwned),
       ),
+);
+
+/// Whether Pro FEATURES are usable right now: the real entitlement, or
+/// sample mode. In sample mode every paid feature opens on the built-in
+/// sample data so a store reviewer (who can't buy) can try it all.
+///
+/// Sample data lives under its own `sample.` keys, so nothing unlocked here
+/// ever touches the user's own bonds; leaving sample mode returns every
+/// gate to [isProProvider]. The Pro flag is never written, and the Pro
+/// screen and Settings show the real entitlement ([isProProvider]).
+final Provider<bool> proFeaturesProvider = Provider<bool>(
+  (Ref ref) => ref.watch(isProProvider) || ref.watch(sampleModeProvider),
+);
+
+/// True when Pro features are open only because of sample mode, so the
+/// screens can say so.
+final Provider<bool> sampleOpensProProvider = Provider<bool>(
+  (Ref ref) => ref.watch(sampleModeProvider) && !ref.watch(isProProvider),
 );
 
 /// What Pro restricts, in one place so screens, paywall copy and tests agree.

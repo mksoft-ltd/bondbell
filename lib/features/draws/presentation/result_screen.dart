@@ -7,6 +7,7 @@ import '../../settings/presentation/app_settings.dart';
 import '../domain/check_models.dart';
 import 'records_controller.dart';
 import 'result_view.dart';
+import '../../purchases/presentation/purchase_controller.dart';
 
 /// A stored result, opened from Home or History.
 class ResultScreen extends ConsumerWidget {
@@ -21,7 +22,8 @@ class ResultScreen extends ConsumerWidget {
       appBar: AppBar(title: Text(r?.label ?? 'Result')),
       body: Column(
         children: <Widget>[
-          if (sample) const SampleBanner(),
+          if (sample)
+            SampleBanner(proOpen: ref.watch(sampleOpensProProvider)),
           Expanded(
             child: r == null
                 ? PageList(

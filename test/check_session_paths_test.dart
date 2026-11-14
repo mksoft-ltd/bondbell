@@ -346,7 +346,8 @@ void main() {
     expect(c.read(recordsProvider).keys, <String>['2026-11']);
     await c.read(appSettingsProvider.notifier).setSampleMode(true);
     expect(c.read(recordsProvider), isEmpty);
-    expect(c.read(holdersProvider).single.id, 'sample-holder');
+    expect(c.read(holdersProvider).map((h) => h.id),
+        <String>['sample-holder', 'sample-grandad']);
     await c.read(appSettingsProvider.notifier).setSampleMode(false);
     expect(c.read(recordsProvider).keys, <String>['2026-11']);
     expect(c.read(holdersProvider).map((h) => h.id), <String>['me', 'gran']);

@@ -9,9 +9,9 @@ import '../../settings/presentation/app_settings.dart';
 import '../domain/bond_number.dart';
 import '../domain/holder.dart';
 
-/// The sample holder: one modern statement range and an old certificate.
-/// The bundled sample lists contain wins for both (see
-/// tool/generate_sample_data.py).
+/// The sample holders: one with a modern statement range and an old
+/// certificate, and a relative with old paper certificates. The bundled
+/// sample lists contain wins for both (see tool/generate_sample_data.py).
 List<Holder> sampleHolders() => <Holder>[
   Holder(
     id: 'sample-holder',
@@ -26,6 +26,19 @@ List<Holder> sampleHolders() => <Holder>[
         id: 'sample-r2',
         start: BondNumber.parse('47DW185520'),
         end: BondNumber.parse('47DW185569'),
+      ),
+    ],
+  ),
+  // A second holder, so the Pro "more than one holder" feature has
+  // something to show in sample mode: a relative's old paper certificates.
+  Holder(
+    id: 'sample-grandad',
+    name: 'Grandad (sample)',
+    ranges: <BondRange>[
+      BondRange(
+        id: 'sample-r3',
+        start: BondNumber.parse('9JN000100'),
+        end: BondNumber.parse('9JN000149'),
       ),
     ],
   ),
@@ -122,7 +135,7 @@ class HoldersController extends Notifier<List<Holder>> {
   /// Pro. The screens explain this first; the check here makes the gate
   /// hold whichever path calls it.
   Future<Holder> addHolder(String name) async {
-    if (!ref.read(isProProvider) && state.length >= FreeTier.maxHolders) {
+    if (!ref.read(proFeaturesProvider) && state.length >= FreeTier.maxHolders) {
       throw const FreeTierLimitException();
     }
     final Holder h = Holder(id: newId(), name: name.trim());

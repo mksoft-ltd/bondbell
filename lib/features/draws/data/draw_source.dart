@@ -358,6 +358,13 @@ class SampleDrawSource implements DrawSource {
 
   static const String sampleDrawId = '2026-11';
   static const String winnersAsset = 'assets/sample/sample_winners.zip';
+
+  /// Earlier sample months, so Pro's earlier-draws check can be tried in
+  /// sample mode (October has a win for each sample holder; September none).
+  static const Map<String, String> earlierWinnersAssets = <String, String>{
+    '2026-10': 'assets/sample/sample_winners_2026_10.zip',
+    '2026-09': 'assets/sample/sample_winners_2026_09.zip',
+  };
   static const String unclaimedAsset = 'assets/sample/sample_unclaimed.zip';
 
   static final NsiIndex index = NsiIndex(
@@ -366,6 +373,16 @@ class SampleDrawSource implements DrawSource {
         id: sampleDrawId,
         label: 'November 2026 (sample)',
         url: Uri.parse('asset:///$winnersAsset'),
+      ),
+      RemoteList(
+        id: '2026-10',
+        label: 'October 2026 (sample)',
+        url: Uri.parse('asset:///${earlierWinnersAssets['2026-10']}'),
+      ),
+      RemoteList(
+        id: '2026-09',
+        label: 'September 2026 (sample)',
+        url: Uri.parse('asset:///${earlierWinnersAssets['2026-09']}'),
       ),
     ],
     unclaimed: RemoteList(
@@ -385,8 +402,9 @@ class SampleDrawSource implements DrawSource {
   Future<int?> sizeOf(RemoteList list) async =>
       (await _bundle.load(_asset(list))).lengthInBytes;
 
-  String _asset(RemoteList l) =>
-      l.id == 'unclaimed' ? unclaimedAsset : winnersAsset;
+  String _asset(RemoteList l) => l.id == 'unclaimed'
+      ? unclaimedAsset
+      : earlierWinnersAssets[l.id] ?? winnersAsset;
 
   @override
   Future<File> download(

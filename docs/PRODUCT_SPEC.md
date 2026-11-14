@@ -59,9 +59,11 @@ only descriptively in body copy; never in the name or icon.
    numbers, not real results" banner. Runs the real download/scan pipeline
    against bundled **synthetic** ZIPs (`tool/generate_sample_data.py`,
    random numbers, fixed seed; nothing from NS&I). Sample data lives in its
-   own storage namespace (`sample.*`) and never mixes with real data. The
-   sample holder (£20,050: one statement range and one old certificate) wins
-   £100 + £25 in the sample draw and has a £50 unclaimed prize.
+   own storage namespace (`sample.*`) and never mixes with real data. Two
+   sample holders: "Sample holder" (£20,050: a statement range and an old
+   certificate) and "Grandad (sample)" (£50 of old certificates). Three
+   sample months: November (£100 + £25), October (£50 + £25, one prize each
+   holder), September (no prizes); the sample unclaimed list has £50 + £25.
 7. **Tip jar** (Settings, and one quiet card under a real win result; never
    blocks the result, hidden in sample mode). Says plainly that tips unlock
    nothing.
@@ -76,7 +78,18 @@ only descriptively in body copy; never in the name or icon.
 | History and stats | — | Yes |
 | Reminders, sample mode | Yes | Yes |
 
-The gate lives in one provider (`isProProvider`) plus a second check inside
+**Sample mode opens every Pro feature** on the built-in sample data
+(store reviewers can't buy): `proFeaturesProvider` = real Pro OR sample
+mode, used by every feature gate. Sample data lives under `sample.` keys, so
+nothing opened there touches the user's own bonds; leaving sample mode
+returns every gate to the real entitlement. The Pro flag is never written,
+and the Pro screen and Settings show the real, unbought state (buy button,
+store price). The banner says "Pro features are open so you can try them
+with sample data." and the Pro screen adds "You're in sample mode, so these
+features are open to try on the sample data. To use them with your own
+bonds, unlock Pro."
+
+The real entitlement lives in one provider (`isProProvider`) plus a second check inside
 the check-session controller. Paywall copy (`ProScreen.benefits`) lists
 exactly these four things; there is no platform-specific gating, so every
 benefit is reachable on both platforms. No timers, no strike-through prices,

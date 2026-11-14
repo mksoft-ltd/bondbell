@@ -243,7 +243,7 @@ class _EarlierDraws extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ThemeData t = Theme.of(context);
-    final bool pro = ref.watch(isProProvider);
+    final bool pro = ref.watch(proFeaturesProvider);
     final AsyncValue<NsiIndex?> index = ref.watch(indexProvider);
     final Map<String, CheckRecord> records = ref.watch(recordsProvider);
     final String fp = holdingsFingerprint(ref.watch(holdersProvider));

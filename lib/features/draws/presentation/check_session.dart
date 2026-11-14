@@ -494,7 +494,7 @@ class CheckSessionController extends Notifier<CheckSessionState> {
 
   /// Defence in depth: the screens already hide these behind Pro.
   String? _gate(CheckRequest request, NsiIndex index) {
-    final bool pro = ref.read(isProProvider);
+    final bool pro = ref.read(proFeaturesProvider);
     if (pro) return null;
     if (request.kind == CheckKind.unclaimedAll) {
       return 'Checking all your bonds against the unclaimed list is part of '

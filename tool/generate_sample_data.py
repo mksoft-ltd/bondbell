@@ -10,9 +10,18 @@ import io, random, zipfile
 
 random.seed(20261114)
 LETTERS = "ABCDEFGHJKLMNPQRSTVWXYZ"
-SAMPLE_RANGES = [("312KM", 100000, 119999), ("47DW", 185520, 185569)]
+# Sample holder: a statement range and an old certificate. "Grandad
+# (sample)": an old paper certificate run. Mirrors sampleHolders() in
+# lib/features/bonds/presentation/holders_controller.dart.
+SAMPLE_RANGES = [("312KM", 100000, 119999), ("47DW", 185520, 185569), ("9JN", 100, 149)]
 DRAW_WINS = {100: ["312KM104217"], 25: ["312KM104388"]}
-UNCLAIMED_WINS = {50: ["47DW185533"]}
+UNCLAIMED_WINS = {50: ["47DW185533"], 25: ["9JN000137"]}
+# Earlier sample months, so Pro's earlier-draws check has something to open
+# in sample mode: October has a win for each holder, September has none.
+EARLIER = [
+    ("assets/sample/sample_winners_2026_10.zip", {25: ["47DW185541"], 50: ["9JN000120"]}),
+    ("assets/sample/sample_winners_2026_09.zip", {}),
+]
 TIERS = [(1000000, 2), (100000, 4), (50000, 6), (25000, 8), (10000, 12),
          (5000, 16), (1000, 40), (500, 80), (100, 640), (50, 640), (25, 480)]
 ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI"]
@@ -39,7 +48,7 @@ def rows(nums, per=8):
         yield " ".join(f"{x:>11}" for x in nums[i:i + per])
 
 
-def winners():
+def winners(draw_wins=DRAW_WINS):
     out = io.StringIO()
     bar = "_" * 95
     out.write(f"{bar}\r\n\r\n\r\nPREMIUM BOND PRIZE DRAW{'Sample 2026':>72}\r\n{bar}\r\n\r\n")
@@ -52,7 +61,7 @@ def winners():
         out.write("| " + " | ".join(f"{c:<44}" for c in cells[i:i + 2]) + " |\r\n" + bar + "\r\n")
     out.write("\r\n                             NUMBERS DRAWN FOR PRIZES IN THE MONTHLY DRAW\r\n\r\n")
     for i, (v, c) in enumerate(TIERS):
-        planted = DRAW_WINS.get(v, [])
+        planted = draw_wins.get(v, [])
         nums = planted + [rand_bond() for _ in range(c - len(planted))]
         random.shuffle(nums)
         out.write(f"\r\n                Part {ROMAN[i]} - Numbers drawn for Prizes of £{v:,} each \r\n\r\n")
@@ -85,4 +94,6 @@ def write_zip(path, name, text):
 
 write_zip("assets/sample/sample_winners.zip", "SAMPLE_WINNERS.txt", winners())
 write_zip("assets/sample/sample_unclaimed.zip", "SAMPLE_UNCLAIMED.txt", unclaimed())
+for path, wins in EARLIER:
+    write_zip(path, "SAMPLE_WINNERS.txt", winners(wins))
 print("written")

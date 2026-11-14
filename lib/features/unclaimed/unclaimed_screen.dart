@@ -44,7 +44,7 @@ class _UnclaimedScreenState extends ConsumerState<UnclaimedScreen> {
   @override
   Widget build(BuildContext context) {
     final ThemeData t = Theme.of(context);
-    final bool pro = ref.watch(isProProvider);
+    final bool pro = ref.watch(proFeaturesProvider);
     final Map<String, CheckRecord> records = ref.watch(recordsProvider);
     final List<Holder> holders = ref.watch(holdersProvider);
     final int bonds = uniqueBondCount(holders);

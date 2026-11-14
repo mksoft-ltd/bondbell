@@ -8,6 +8,7 @@ import '../../../shared/widgets/common.dart';
 import '../../settings/presentation/app_settings.dart';
 import 'check_session.dart';
 import 'result_view.dart';
+import '../../purchases/presentation/purchase_controller.dart';
 
 /// Find → confirm size → download → scan → result, for one list.
 class CheckScreen extends ConsumerStatefulWidget {
@@ -88,7 +89,8 @@ class _CheckScreenState extends ConsumerState<CheckScreen> {
         appBar: AppBar(title: Text(title)),
         body: Column(
           children: <Widget>[
-            if (sample) const SampleBanner(),
+            if (sample)
+              SampleBanner(proOpen: ref.watch(sampleOpensProProvider)),
             Expanded(
               child: s.phase == CheckPhase.done && s.record != null
                   ? ResultView(record: s.record!)
