@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/storage/local_store.dart';
+import '../../purchases/presentation/purchase_controller.dart';
 import '../../settings/presentation/app_settings.dart';
 import '../domain/bond_number.dart';
 import '../domain/holder.dart';
@@ -62,7 +63,13 @@ class HoldersController extends Notifier<List<Holder>> {
     await _store.writeJson(_key, next.map((Holder h) => h.toJson()).toList());
   }
 
+  /// Throws [FreeTierLimitException] past [FreeTier.maxHolders] without
+  /// Pro. The screens explain this first; the check here makes the gate
+  /// hold whichever path calls it.
   Future<Holder> addHolder(String name) async {
+    if (!ref.read(isProProvider) && state.length >= FreeTier.maxHolders) {
+      throw const FreeTierLimitException();
+    }
     final Holder h = Holder(id: newId(), name: name.trim());
     await _save(<Holder>[...state, h]);
     return h;
@@ -116,6 +123,12 @@ class HoldersController extends Notifier<List<Holder>> {
       ]);
 
   Future<void> replaceAll(List<Holder> holders) => _save(holders);
+}
+
+class FreeTierLimitException implements Exception {
+  const FreeTierLimitException();
+  @override
+  String toString() => 'More than one holder needs Bondbell Pro.';
 }
 
 final NotifierProvider<HoldersController, List<Holder>> holdersProvider =

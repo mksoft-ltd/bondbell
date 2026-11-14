@@ -69,21 +69,13 @@ class LocalReminderService implements ReminderService {
   Future<void> scheduleUpcoming() async {
     await init();
     await _plugin.cancelAll();
-    final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
-    final List<DateTime> days = ResultsCalendar.upcomingResultsDays(
-      DateTime(now.year, now.month, now.day, now.hour, now.minute),
-      monthsAhead,
+    final List<tz.TZDateTime> times = reminderTimes(
+      tz.TZDateTime.now(tz.local),
+      tz.getLocation('Europe/London'),
     );
-    for (int i = 0; i < days.length; i++) {
-      final DateTime d = days[i];
-      final tz.TZDateTime at = tz.TZDateTime(
-        tz.local,
-        d.year,
-        d.month,
-        d.day,
-        d.hour,
-      );
-      final String month = DateFormat('MMMM').format(d);
+    for (int i = 0; i < times.length; i++) {
+      final tz.TZDateTime at = times[i];
+      final String month = DateFormat('MMMM').format(at);
       await _plugin.zonedSchedule(
         id: 1000 + i,
         title: 'New prize results are due',
@@ -106,6 +98,24 @@ class LocalReminderService implements ReminderService {
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       );
     }
+  }
+
+  /// When each reminder fires: 09:00 UK time (GMT or BST) on each of the
+  /// next [count] results days, whatever time zone the device is in.
+  @visibleForTesting
+  static List<tz.TZDateTime> reminderTimes(
+    tz.TZDateTime now,
+    tz.Location london, {
+    int count = monthsAhead,
+  }) {
+    final tz.TZDateTime uk = tz.TZDateTime.from(now, london);
+    return <tz.TZDateTime>[
+      for (final DateTime d in ResultsCalendar.upcomingResultsDays(
+        DateTime(uk.year, uk.month, uk.day, uk.hour, uk.minute),
+        count,
+      ))
+        tz.TZDateTime(london, d.year, d.month, d.day, d.hour),
+    ];
   }
 
   @override

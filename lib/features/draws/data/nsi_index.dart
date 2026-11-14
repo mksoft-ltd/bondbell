@@ -57,7 +57,7 @@ abstract final class NsiIndexParser {
       final String href = m.group(1)!.trim();
       final String text = _text(m.group(2)!);
       final Uri url = base.resolve(href);
-      if (url.scheme != 'https' || !url.host.endsWith('nsandi.com')) continue;
+      if (url.scheme != 'https' || !isNsiHost(url.host)) continue;
       final String lower = '${href.toLowerCase()} ${text.toLowerCase()}';
       if (lower.contains('unclaimed')) {
         unclaimed ??= RemoteList(
@@ -77,6 +77,13 @@ abstract final class NsiIndexParser {
     final List<RemoteList> sorted = draws.values.toList()
       ..sort((RemoteList a, RemoteList b) => b.id.compareTo(a.id));
     return NsiIndex(draws: sorted, unclaimed: unclaimed);
+  }
+
+  /// nsandi.com or a subdomain of it; not a look-alike such as
+  /// `evilnsandi.com`.
+  static bool isNsiHost(String host) {
+    final String h = host.toLowerCase();
+    return h == 'nsandi.com' || h.endsWith('.nsandi.com');
   }
 
   static String _text(String inner) => inner

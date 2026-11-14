@@ -152,7 +152,11 @@ class CheckSessionController extends Notifier<CheckSessionState> {
 
   @override
   CheckSessionState build() {
-    ref.onDispose(_abortWork);
+    ref.onDispose(() {
+      // Retire the running check so it never writes to a disposed ref.
+      _generation++;
+      _abortWork();
+    });
     return const CheckSessionState();
   }
 

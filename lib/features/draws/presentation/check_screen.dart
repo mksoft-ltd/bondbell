@@ -69,7 +69,13 @@ class _CheckScreenState extends ConsumerState<CheckScreen> {
       onPopInvokedWithResult: (bool didPop, Object? _) async {
         if (didPop) {
           if (s.phase == CheckPhase.ready) {
-            ref.read(checkSessionProvider.notifier).reset();
+            // A declarative route change (router.go) invokes this while the
+            // Navigator is rebuilding, when providers can't be modified, and
+            // this State is about to be disposed: reset after the frame.
+            final CheckSessionController ctrl = ref.read(
+              checkSessionProvider.notifier,
+            );
+            Future<void>.microtask(ctrl.reset);
           }
           return;
         }
